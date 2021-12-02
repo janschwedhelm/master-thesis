@@ -2,6 +2,9 @@
 
 # Latent Space Optimization via Weighted Retraining of Deep Generative Models with Application on Image Data
 
+  <img src="celeba-sngan-bestpoints.png"
+     alt="celeba-sngan-bestpoints"
+     width="550" height="300" />
 </div>
 
 ## Description
