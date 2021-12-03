@@ -21,14 +21,14 @@ All code was designed to be run on a single GPU using Google Colab. For that, th
 
 ### Set up Data
 
-Data can be downloaded using the following link: https://drive.google.com/drive/folders/12mSO8DsnBUBvsV0_zfJrHfpsyI3Vp-iw?usp=sharing.
+Data, pretrained models and optimization results can be downloaded using the following link: https://drive.google.com/drive/folders/12mSO8DsnBUBvsV0_zfJrHfpsyI3Vp-iw?usp=sharing.
 
 The folder `data` should then be uploaded to the Google Drive root directory of this repository.
 For MNIST, all used data is provided. For CelebA, a relevant sample is included in zipped form.
 
 ### Training Models
 
-**Note:** This section is optional, since pretrained models for all experiments are provided under `logs/train`.
+**Note:** This section is optional, since pretrained models for all experiments are provided under `logs/train` using the above Google Drive link.
 
 To train each type of model:
 
@@ -39,7 +39,7 @@ The default parameters for all models are the ones used in the thesis. Due to di
 
 ### Run Weighted Retraining Experiments
 
-**Note:** This section is optional, since all results are provided under `logs/opt`.
+**Note:** This section is optional, since all results are provided under `logs/opt` using the above Google Drive link.
 
 To run the core weighted retraining experiments:
 
