@@ -27,7 +27,7 @@ for seed in "${seed_array[@]}"; do
                 --property_key=thickness \
                 --query_budget="$query_budget" \
                 --retraining_frequency="$r" \
-                --result_root="${root_dir}/${weight_type}/k_${k}/r_${r}/gmm_10/c_-24.5/seed${seed}" \
+                --result_root="${root_dir}/k_${k}/r_${r}/gmm_10/c_-24.5/seed${seed}" \
                 --pretrained_model_file="$start_model" \
                 --weight_type="$weight_type" \
                 --rank_weight_k="$k" \

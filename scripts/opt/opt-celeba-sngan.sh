@@ -21,10 +21,10 @@ pretrained_model_prior="normal"
 
 
 # Optimization approach
-root_dir="logs/opt/celeba/sn-gan/z_64"
+root_dir="logs/opt/celeba/sn-gan/optimization"
 start_model_netg="logs/train/celeba/sn-gan/z_64/checkpoints/netG/netG_80000_steps.pth"
 start_model_netd="logs/train/celeba/sn-gan/z_64/checkpoints/netD/netD_80000_steps.pth"
-python weighted_retraining/opt_scripts/opt_celeba_sngan.py \
+python src/opt_scripts/opt_celeba_sngan.py \
     --seed="1" \
     --tensor_dir="/content/data_tensors_64" \
     --property_id=3 \
@@ -36,7 +36,7 @@ python weighted_retraining/opt_scripts/opt_celeba_sngan.py \
     --attr_file="weighted_retraining/configs/attributes.json" \
     --query_budget="$query_budget" \
     --retraining_frequency="$r" \
-    --result_root="${root_dir}/${weight_type}/k_${k}/r_${r}/seed1" \
+    --result_root="${root_dir}/k_${k}/r_${r}/seed1" \
     --pretrained_netg_model_file="$start_model_netg" \
     --pretrained_netd_model_file="$start_model_netd" \
     --pretrained_model_prior="$pretrained_model_prior" \
@@ -60,10 +60,10 @@ python weighted_retraining/opt_scripts/opt_celeba_sngan.py \
 
 
 # Sampling approach
-root_dir="logs/opt/celeba/sn-gan/z_128"
+root_dir="logs/opt/celeba/sn-gan/sampling"
 start_model_netg="logs/train/celeba/sn-gan/z_128/checkpoints/netG/netG_80000_steps.pth"
 start_model_netd="logs/train/celeba/sn-gan/z_128/checkpoints/netD/netD_80000_steps.pth"
-python weighted_retraining/opt_scripts/opt_celeba_sngan.py \
+python src/opt_scripts/opt_celeba_sngan.py \
     --seed="1" \
     --tensor_dir="/content/data_tensors_64" \
     --property_id=3 \
@@ -75,7 +75,7 @@ python weighted_retraining/opt_scripts/opt_celeba_sngan.py \
     --attr_file="weighted_retraining/configs/attributes.json" \
     --query_budget="$query_budget" \
     --retraining_frequency="$r" \
-    --result_root="${root_dir}/${weight_type}/k_${k}/r_${r}/seed1" \
+    --result_root="${root_dir}/k_${k}/r_${r}/seed1" \
     --pretrained_netg_model_file="$start_model_netg" \
     --pretrained_netd_model_file="$start_model_netd" \
     --pretrained_model_prior="$pretrained_model_prior" \

@@ -18,7 +18,7 @@ weight_type="rank"
 # VAE experiments with GMM-N constraint
 for digit in "${digit_array[@]}"; do
     for seed in "${seed_array[@]}"; do
-        root_dir="logs/opt/mnist_z2/${digit}"
+        root_dir="logs/opt/mnist_z2/${digit}/vae"
         start_model="logs/train/mnist_z2/${digit}/vae/lightning_logs/version_0/checkpoints/last.ckpt"
         python weighted_retraining/opt_scripts/opt_mnist_perfect.py \
             --seed="$seed" $gpu \
@@ -26,7 +26,7 @@ for digit in "${digit_array[@]}"; do
             --property_key=thickness \
             --query_budget="$query_budget" \
             --retraining_frequency="$r" \
-            --result_root="${root_dir}/${weight_type}/k_${k}/r_${r}/vae/gmm_n/c_-12/seed${seed}" \
+            --result_root="${root_dir}/k_${k}/r_${r}/gmm_n/c_-12/seed${seed}" \
             --pretrained_model_type="vae" \
             --pretrained_model_file="$start_model" \
             --weight_type="$weight_type" \
@@ -42,7 +42,7 @@ done
 # VAE experiments with GMM-10 constraint
 for digit in "${digit_array[@]}"; do
     for seed in "${seed_array[@]}"; do
-        root_dir="logs/opt/mnist_z2/${digit}"
+        root_dir="logs/opt/mnist_z2/${digit}/vae"
         start_model="logs/train/mnist_z2/${digit}/vae/lightning_logs/version_0/checkpoints/last.ckpt"
         python weighted_retraining/opt_scripts/opt_mnist_perfect.py \
             --seed="$seed" $gpu \
@@ -50,7 +50,7 @@ for digit in "${digit_array[@]}"; do
             --property_key=thickness \
             --query_budget="$query_budget" \
             --retraining_frequency="$r" \
-            --result_root="${root_dir}/${weight_type}/k_${k}/r_${r}/vae/gmm_10/c_-4/seed${seed}" \
+            --result_root="${root_dir}/${weight_type}/k_${k}/r_${r}/gmm_10/c_-4/seed${seed}" \
             --pretrained_model_type="vae" \
             --pretrained_model_file="$start_model" \
             --weight_type="$weight_type" \
@@ -68,7 +68,7 @@ done
 # RAE experiments with GMM-10 constraint
 for digit in "${digit_array[@]}"; do
     for seed in "${seed_array[@]}"; do
-        root_dir="logs/opt/mnist_z2/${digit}"
+        root_dir="logs/opt/mnist_z2/${digit}/rae"
         start_model="logs/train/mnist_z2/${digit}/rae/lightning_logs/version_0/checkpoints/last.ckpt"
         python weighted_retraining/opt_scripts/opt_mnist_perfect.py \
             --seed="$seed" $gpu \
@@ -76,7 +76,7 @@ for digit in "${digit_array[@]}"; do
             --property_key=thickness \
             --query_budget="$query_budget" \
             --retraining_frequency="$r" \
-            --result_root="${root_dir}/${weight_type}/k_${k}/r_${r}/rae/gmm_10/c_-4/seed${seed}" \
+            --result_root="${root_dir}/${weight_type}/k_${k}/r_${r}/gmm_10/c_-4.5/seed${seed}" \
             --pretrained_model_type="rae" \
             --pretrained_model_file="$start_model" \
             --weight_type="$weight_type" \
