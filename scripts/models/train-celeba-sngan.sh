@@ -1,4 +1,4 @@
-# Script to train CelebA-SN-GAN model for the thesis
+# Script to train CelebA-SNGAN model for the thesis
 
 # Meta flags
 gpu="--gpu"  # change to "" if no GPU is to be used

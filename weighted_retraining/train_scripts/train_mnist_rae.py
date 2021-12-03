@@ -47,7 +47,7 @@ if __name__ == "__main__":
     # add weighting specific args
     parser = utils.DataWeighter.add_weight_args(parser)
     #add trainer specific args
-    utils.add_default_trainer_args(parser, default_root="logs/train/mnist_2")
+    utils.add_default_trainer_args(parser, default_root="logs/train/mnist_z2")
 
     # Parse arguments
     hparams = parser.parse_args()
