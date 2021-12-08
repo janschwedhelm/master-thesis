@@ -5,7 +5,7 @@ gpu="--gpu"  # change to "" if no GPU is to be used
 seed=0
 root_dir="logs/train"
 
-python weighted_retraining/train_scripts/train_mnist_classifier.py \
+python src/train_scripts/train_mnist_classifier.py \
     --root_dir="$root_dir/mnist_classifier" \
     --seed="$seed" $gpu \
     --dataset_path=data/mnist/mnist_BTrue.npz \

@@ -4,12 +4,12 @@
 gpu="--gpu"  # change to "" if no GPU is to be used
 seed=0
 root_dir="logs/train"
-digit_array=( 0 1 2 3 4 5 6 7 8 9 )
+digit_array=( 3 )
 
 # Latent dimension = 2
 for d in "${digit_array[@]}"; do
     for c in "${threshold_array[@]}"; do
-        python weighted_retraining/train_scripts/train_mnist_vae.py \
+        python src/train_scripts/train_mnist_vae.py \
             --root_dir="$root_dir/mnist_z2/${d}/vae" \
             --seed="$seed" $gpu \
             --latent_dim=2 \
@@ -24,7 +24,7 @@ done
 
 # Latent dimension = 16
 for d in "${digit_array[@]}"; do
-    python weighted_retraining/train_scripts/train_mnist_vae.py \
+    python src/train_scripts/train_mnist_vae.py \
         --root_dir="$root_dir/mnist_z16/${d}/vae" \
         --seed="$seed" $gpu \
         --latent_dim=16 \

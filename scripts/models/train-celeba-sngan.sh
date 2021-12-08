@@ -7,7 +7,7 @@ root_dir="logs/train"
 celeba_data_path="data/celeba-dialog"
 
 # Latent dimension = 64
-python weighted_retraining/train_scripts/train_celeba_sngan.py \
+python src/train_scripts/train_celeba_sngan.py \
     --root_dir="$root_dir/celeba/sn-gan/z_64" \
     --seed="$seed" \
     --latent_dim=128 \
@@ -22,7 +22,7 @@ python weighted_retraining/train_scripts/train_celeba_sngan.py \
     --mode="all"
 
 # Latent dimension = 128
-python weighted_retraining/train_scripts/train_celeba_sngan.py \
+python src/train_scripts/train_celeba_sngan.py \
     --root_dir="$root_dir/celeba/sn-gan/z_128" \
     --seed="$seed" \
     --latent_dim=128 \

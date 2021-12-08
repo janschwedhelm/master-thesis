@@ -7,7 +7,7 @@ root_dir="logs/train"
 celeba_data_path="data/celeba-dialog"
 
 # Train shapes VAE
-  python weighted_retraining/train_scripts/train_celeba_vqvae.py \
+  python src/train_scripts/train_celeba_vqvae.py \
       --root_dir="$root_dir/celeba/vq-vae" \
       --seed="$seed" $gpu \
       --num_embeddings=256 \
