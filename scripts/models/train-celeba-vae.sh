@@ -6,7 +6,7 @@ seed=0
 root_dir="logs/train"
 celeba_data_path="data/celeba-dialog"
 
-python weighted_retraining/train_scripts/train_celeba_vae.py \
+python src/train_scripts/train_celeba_vae.py \
     --root_dir="$root_dir/celeba/vae" \
     --seed="$seed" $gpu \
     --latent_dim=64 \
