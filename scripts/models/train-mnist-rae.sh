@@ -4,7 +4,7 @@
 gpu="--gpu"  # change to "" if no GPU is to be used
 seed=0
 root_dir="logs/train"
-digit_array=( 0 1 2 3 4 5 6 7 8 9 )
+digit_array=( 3 )
 
 for d in "${digit_array[@]}"; do
     python src/train_scripts/train_mnist_rae.py \
