@@ -19,12 +19,11 @@ The code in this repository is primarily intended for the following purposes:
 
 All code was designed to be run on a single GPU using Google Colab. For that, this repository can simply be copied to Google Drive. Then, the notebooks found under `notebooks` can be executed to reproduce the results of the thesis without the need of installing further dependencies.
 
-### Set up Data
+### Set up Data and Pretrained Models
 
 Data, pretrained models and optimization results can be downloaded using the following link: https://drive.google.com/drive/folders/12mSO8DsnBUBvsV0_zfJrHfpsyI3Vp-iw?usp=sharing.
 
 The folders `data` and `logs` should then be uploaded to the Google Drive root directory of this repository.
-For MNIST, all used data is provided. For CelebA, a relevant sample is included in zipped form.
 
 ### Training Models
 
