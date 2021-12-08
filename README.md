@@ -21,7 +21,10 @@ All code was designed to be run on a single GPU using Google Colab. For that, th
 
 ### Set up Data
 
-For MNIST, all used data is provided under `data/mnist`. A relevant sample of used CelebA data is included under `data/celeba-dialog` in zipped form.
+Data, pretrained models and optimization results can be downloaded using the following link: https://drive.google.com/drive/folders/12mSO8DsnBUBvsV0_zfJrHfpsyI3Vp-iw?usp=sharing.
+
+The folders `data` and `logs` should then be uploaded to the Google Drive root directory of this repository.
+For MNIST, all used data is provided. For CelebA, a relevant sample is included in zipped form.
 
 ### Training Models
 
