@@ -7,7 +7,7 @@ root_dir="logs/train"
 digit_array=( 0 1 2 3 4 5 6 7 8 9 )
 
 for d in "${digit_array[@]}"; do
-    python weighted_retraining/train_scripts/train_mnist_rae.py \
+    python src/train_scripts/train_mnist_rae.py \
         --root_dir="$root_dir/mnist_z2/${d}/rae" \
         --seed="$seed" $gpu \
         --latent_dim=2 \
@@ -16,7 +16,6 @@ for d in "${digit_array[@]}"; do
         --max_epochs=20 \
         --batch_size=16 \
         --latent_emb_weight=1 \
-        --reg_weight=1 \
-        --opt_constraint_strategy="gmm_fit"
+        --reg_weight=1
 done
     
