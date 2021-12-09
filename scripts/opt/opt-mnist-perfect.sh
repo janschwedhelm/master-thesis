@@ -4,7 +4,7 @@
 gpu="--gpu"
 
 seed_array=( 1 2 3 4 5 )
-digit_array=( 0 1 2 3 4 5 6 7 8 9 )
+digit_array=( 3 )
 
 # Weighted retraining hyperparameters
 query_budget=500
@@ -20,7 +20,7 @@ for digit in "${digit_array[@]}"; do
     for seed in "${seed_array[@]}"; do
         root_dir="logs/opt/mnist_z2/${digit}/vae"
         start_model="logs/train/mnist_z2/${digit}/vae/lightning_logs/version_0/checkpoints/last.ckpt"
-        python weighted_retraining/opt_scripts/opt_mnist_perfect.py \
+        python src/opt_scripts/opt_mnist_perfect.py \
             --seed="$seed" $gpu \
             --dataset_path="data/mnist/mnist_D${digit}_Pthickness_BTrue_DF5.npz" \
             --property_key=thickness \
@@ -44,7 +44,7 @@ for digit in "${digit_array[@]}"; do
     for seed in "${seed_array[@]}"; do
         root_dir="logs/opt/mnist_z2/${digit}/vae"
         start_model="logs/train/mnist_z2/${digit}/vae/lightning_logs/version_0/checkpoints/last.ckpt"
-        python weighted_retraining/opt_scripts/opt_mnist_perfect.py \
+        python src/opt_scripts/opt_mnist_perfect.py \
             --seed="$seed" $gpu \
             --dataset_path="data/mnist/mnist_D${digit}_Pthickness_BTrue_DF5.npz" \
             --property_key=thickness \
@@ -70,7 +70,7 @@ for digit in "${digit_array[@]}"; do
     for seed in "${seed_array[@]}"; do
         root_dir="logs/opt/mnist_z2/${digit}/rae"
         start_model="logs/train/mnist_z2/${digit}/rae/lightning_logs/version_0/checkpoints/last.ckpt"
-        python weighted_retraining/opt_scripts/opt_mnist_perfect.py \
+        python src/opt_scripts/opt_mnist_perfect.py \
             --seed="$seed" $gpu \
             --dataset_path="data/mnist/mnist_D${digit}_Pthickness_BTrue_DF5.npz" \
             --property_key=thickness \
