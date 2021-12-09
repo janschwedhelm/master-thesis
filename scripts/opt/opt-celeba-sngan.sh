@@ -33,7 +33,7 @@ python src/opt_scripts/opt_celeba_sngan.py \
     --val_attr_path="$celeba_data_path/val_attr_list.txt" \
     --combined_annotation_path="$celeba_data_path/combined_annotation.txt" \
     --filename_set_path="$celeba_data_path/filename_set.pickle" \
-    --attr_file="weighted_retraining/configs/attributes.json" \
+    --attr_file="src/configs/attributes.json" \
     --query_budget="$query_budget" \
     --retraining_frequency="$r" \
     --result_root="${root_dir}/k_${k}/r_${r}/seed1" \
@@ -72,7 +72,7 @@ python src/opt_scripts/opt_celeba_sngan.py \
     --val_attr_path="$celeba_data_path/val_attr_list.txt" \
     --combined_annotation_path="$celeba_data_path/combined_annotation.txt" \
     --filename_set_path="$celeba_data_path/filename_set.pickle" \
-    --attr_file="weighted_retraining/configs/attributes.json" \
+    --attr_file="src/configs/attributes.json" \
     --query_budget="$query_budget" \
     --retraining_frequency="$r" \
     --result_root="${root_dir}/k_${k}/r_${r}/seed1" \
