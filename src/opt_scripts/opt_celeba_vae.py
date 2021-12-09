@@ -1,5 +1,6 @@
 """ Run weighted retraining for CelebA with the VAE model """
 
+import argparse
 import sys
 import logging
 import subprocess
