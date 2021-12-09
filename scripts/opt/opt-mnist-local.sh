@@ -21,7 +21,7 @@ for seed in "${seed_array[@]}"; do
     for bo_surrogate in "${bo_surrogate_array[@]}"; do
             root_dir="logs/opt/mnist_z16/3/vae"
             start_model="logs/train/mnist_z16/3/vae/lightning_logs/version_0/checkpoints/last.ckpt"
-            python weighted_retraining/opt_scripts/opt_mnist_bin_complex.py \
+            python src/opt_scripts/opt_mnist_bin_complex.py \
                 --seed="$seed" $gpu \
                 --dataset_path=data/mnist/mnist_D${digit}_Pthickness_BTrue_DF5.npz \
                 --property_key=thickness \
