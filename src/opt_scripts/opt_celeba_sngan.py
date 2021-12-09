@@ -1,5 +1,6 @@
 """ Run weighted retraining for CelebA with the SN-GAN model """
 
+import argparse
 import sys
 import logging
 import subprocess
