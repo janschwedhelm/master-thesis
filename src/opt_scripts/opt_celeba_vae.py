@@ -1,6 +1,7 @@
 """ Run weighted retraining for CelebA with the VAE model """
 
 import argparse
+from pathlib import Path
 import sys
 import logging
 import subprocess
