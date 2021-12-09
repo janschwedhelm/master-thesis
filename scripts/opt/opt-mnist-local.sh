@@ -21,9 +21,9 @@ for seed in "${seed_array[@]}"; do
     for bo_surrogate in "${bo_surrogate_array[@]}"; do
             root_dir="logs/opt/mnist_z16/3/vae"
             start_model="logs/train/mnist_z16/3/vae/lightning_logs/version_0/checkpoints/last.ckpt"
-            python src/opt_scripts/opt_mnist_bin_complex.py \
+            python src/opt_scripts/opt_mnist_local.py \
                 --seed="$seed" $gpu \
-                --dataset_path=data/mnist/mnist_D${digit}_Pthickness_BTrue_DF5.npz \
+                --dataset_path=data/mnist/mnist_D3_Pthickness_BTrue_DF5.npz \
                 --property_key=thickness \
                 --query_budget="$query_budget" \
                 --retraining_frequency="$r" \
