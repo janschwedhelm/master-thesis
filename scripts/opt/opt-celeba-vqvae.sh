@@ -21,7 +21,7 @@ celeba_data_path="data/celeba-dialog"
 
 # Run the command
 python src/opt_scripts/opt_celeba_vqvae.py \
-    --seed="$seed" $gpu \
+    --seed="1" $gpu \
     --tensor_dir="/content/data_tensors_64" \
     --property_id=3 \
     --max_property_value=2 \
