@@ -399,7 +399,10 @@ def main_loop(args):
     dataloader = datamodule.train_dataloader()
 
     # Load pre-trained SN-GAN generator / discriminator
-    netG = SNGANGenerator64(nz=128).to(device)
+    if args.lso_strategy == "opt":
+        netG = SNGANGenerator64(nz=64).to(device)
+    else:
+        netG = SNGANGenerator64(nz=128).to(device)
     netD = SNGANDiscriminator64().to(device)
 
     netG.restore_checkpoint(args.pretrained_netg_model_file)
