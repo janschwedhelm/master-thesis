@@ -32,7 +32,7 @@ python src/opt_scripts/opt_celeba_vqvae.py \
     --attr_file="src/configs/attributes.json" \
     --query_budget="$query_budget" \
     --retraining_frequency="$r" \
-    --result_root="${root_dir}/k_${k}/r_${r}/seed1" \
+    --result_root="${root_dir}/k_${k}/r_${r}/seed1_custom" \
     --pretrained_model_file="$start_model" \
     --pretrained_predictor_file="$pretrained_predictor_file" \
     --scaled_predictor_state_dict="$scaled_predictor_state_dict" \
