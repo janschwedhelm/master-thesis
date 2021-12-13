@@ -51,8 +51,8 @@ python src/opt_scripts/opt_celeba_sngan.py \
     --bo_surrogate="DNGO" \
     --mode="all" \
     --batch_size=64 \
-    --n_samples="$sample_size" \
-    --n_best_points="$sample_size" \
+    --n_samples=100000 \
+    --n_best_points=100000 \
     --n_rand_points=0 \
     --opt_constraint_strategy="discriminator" \
     --opt_constraint_threshold=0.5 \
@@ -90,8 +90,8 @@ python src/opt_scripts/opt_celeba_sngan.py \
     --bo_surrogate="DNGO" \
     --mode="all" \
     --batch_size=64 \
-    --n_samples="$sample_size" \
-    --n_best_points="$sample_size" \
+    --n_samples=100000 \
+    --n_best_points=100000 \
     --n_rand_points=0 \
     --opt_constraint_strategy="discriminator" \
     --opt_constraint_threshold=0.5 \
