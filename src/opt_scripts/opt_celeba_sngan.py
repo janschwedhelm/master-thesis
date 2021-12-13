@@ -62,11 +62,14 @@ def retrain_model(netG, netD, optG, optD, dataloader, save_dir, version_str, num
     trainer.train()
 
 
-def generate_samples(netG, netD, n_samples, discriminator_quantile_threshold, device):
+def generate_samples(netG, netD, n_samples, discriminator_quantile_threshold, opt_method, device):
     """ helper function to generate samples """
     batch_size = 50
     images = torch.zeros(size=(n_samples, 3, 64, 64))
-    latents = torch.zeros(size=(n_samples, 128))
+    if opt_method != "sampling":
+        latents = torch.zeros(size=(n_samples, 128))
+    else:
+        latents = torch.zeros(size=(n_samples, 64))
     seed = int(np.random.randint(10000))
     pl.seed_everything(seed)
 
@@ -202,7 +205,7 @@ def latent_optimization(args, netG, netD, scaled_predictor, dataloader, num_quer
     ##################################################
     
     ground_truth_images, ground_truth_latents, _ = generate_samples(netG, netD, args.n_samples,
-                                                                    args.ground_truth_discriminator_threshold, device)
+                                                                    args.ground_truth_discriminator_threshold, args.opt_method, device)
                                                                     
     pred_targets = _batch_get_props(ground_truth_images, scaled_predictor, device)
     
@@ -399,7 +402,7 @@ def main_loop(args):
     dataloader = datamodule.train_dataloader()
 
     # Load pre-trained SN-GAN generator / discriminator
-    if args.lso_strategy == "opt":
+    if args.opt_method != "sampling":
         netG = SNGANGenerator64(nz=64).to(device)
     else:
         netG = SNGANGenerator64(nz=128).to(device)
