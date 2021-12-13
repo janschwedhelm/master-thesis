@@ -240,7 +240,7 @@ def robust_multi_restart_optimizer(
         netD = SNGANDiscriminator64().to(device)
         netG.restore_checkpoint(curr_generator_file)
         netD.restore_checkpoint(curr_discriminator_file)
-        _, latent_grid, disc_prob_threshold = generate_samples(netG, netD, n_samples, opt_constraint_threshold, device=netG.device)
+        _, latent_grid, disc_prob_threshold = generate_samples(netG, netD, n_samples, opt_constraint_threshold, method, device=netG.device)
         
         if logger is not None:
             logger.info(f"Used discriminator threshold: {disc_prob_threshold}")
