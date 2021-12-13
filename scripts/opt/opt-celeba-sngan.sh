@@ -55,8 +55,7 @@ python src/opt_scripts/opt_celeba_sngan.py \
     --n_best_points=100000 \
     --n_rand_points=0 \
     --opt_constraint_strategy="discriminator" \
-    --opt_constraint_threshold=0.5 \
-    --lso_strategy="opt"
+    --opt_constraint_threshold=0.5
 
 
 # Sampling approach
@@ -86,7 +85,7 @@ python src/opt_scripts/opt_celeba_sngan.py \
     --n_retrain_steps="$n_retrain_steps" \
     --n_init_retrain_steps="$n_init_retrain_steps" \
     --sample_distribution="$sample_distribution" \
-    --opt_method="SLSQP" \
+    --opt_method="sampling" \
     --bo_surrogate="DNGO" \
     --mode="all" \
     --batch_size=64 \
@@ -94,5 +93,4 @@ python src/opt_scripts/opt_celeba_sngan.py \
     --n_best_points=100000 \
     --n_rand_points=0 \
     --opt_constraint_strategy="discriminator" \
-    --opt_constraint_threshold=0.5 \
-    --lso_strategy="sampling"
+    --opt_constraint_threshold=0.5
