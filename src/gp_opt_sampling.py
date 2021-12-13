@@ -233,7 +233,10 @@ def robust_multi_restart_optimizer(
     if opt_constraint_strategy == "discriminator":
         # Apply discriminator constraints
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        netG = SNGANGenerator64(nz=128).to(device)
+        if method != "sampling":
+            netG = SNGANGenerator64(nz=64).to(device)
+        else:
+            netG = SNGANGenerator64(nz=128).to(device)
         netD = SNGANDiscriminator64().to(device)
         netG.restore_checkpoint(curr_generator_file)
         netD.restore_checkpoint(curr_discriminator_file)
