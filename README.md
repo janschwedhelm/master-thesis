@@ -53,7 +53,7 @@ The most important parameters are:
 - `--retraining_frequency` controls the retraining frequencies (number of epochs between retrainings)
 - `--result_root` is the directory to save the results in
 - `--opt_constraint_strategy` is the strategy to constrain LSO with. Can be `gmm_full` or `gmm_fit` (then, `n_gmm_components` has to be provided) for VAE experiments, `gmm_fit` for RAE experiments and `discriminator` for SN-GAN experiments.
-- `--opt_constraint_strategy` is the chosen threshold value that defines the optimization constraint. Represents the log-density threshold for GMM-constraints if `gmm_full` or `gmm_fit` strategy is chosen, and the fraction of sample points to reject (w.r. to discriminator score) if "discriminator" strategy is chosen.
+- `--opt_constraint_strategy` is the chosen threshold value that defines the optimization constraint. Represents the log-density threshold for GMM-constraints if `gmm_full` or `gmm_fit` strategy is chosen, and the fraction of sample points to reject (w.r. to discriminator score) if `discriminator strategy is chosen.
 
 The default parameters for all experiments can be chosen to reproduce the results reported in the thesis, using the provided pretrained models.
 Note that experiments on CelebA and MNIST (m=16) will take a long time to finish (approximately 3 hours). Due to different implementations of random seeds on different systems, you may not get the exact same results.
