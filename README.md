@@ -38,7 +38,7 @@ The default parameters for all models are the ones used in the thesis. Due to di
 
 ### Run Weighted Retraining Experiments
 
-**Note:** This section is optional, since all results are provided under `logs/opt` using the above Google Drive link.
+**Note:** This section is optional, since all results are provided under `logs/opt` using the above Google Drive link. To run the VQ-VAE experiments, the folders `entmoot` and `LightGBM` (see provided Google Drive link) contain the necessary code. Thus, they should be uploaded to the Google Drive root directory of this repository in advance.
 
 To run the core weighted retraining experiments:
 
