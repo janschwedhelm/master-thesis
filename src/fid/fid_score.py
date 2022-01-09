@@ -1,36 +1,9 @@
-"""Calculates the Frechet Inception Distance (FID) to evalulate GANs
-The FID metric calculates the distance between two distributions of images.
-Typically, we have summary statistics (mean & covariance matrix) of one
-of these distributions, while the 2nd distribution is given by a GAN.
-When run as a stand-alone program, it compares the distribution of
-images that are stored as PNG/JPEG at a specified location with a
-distribution given by summary statistics (in pickle format).
-The FID is calculated by assuming that X_1 and X_2 are the activations of
-the pool_3 layer of the inception net for generated samples and real world
-samples respectively.
-See --help to see further details.
-Code apapted from https://github.com/bioinf-jku/TTUR to use PyTorch instead
-of Tensorflow
-Copyright 2018 Institute of Bioinformatics, JKU Linz
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-   http://www.apache.org/licenses/LICENSE-2.0
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+"""Calculates the Frechet Inception Distance (FID) to evalulate sample quality
+Code apapted from https://github.com/mseitzer/pytorch-fid
 """
-import os
-import pathlib
-from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
-from multiprocessing import cpu_count
 
 import numpy as np
 import torch
-import torchvision.transforms as TF
-from PIL import Image
 from scipy import linalg
 from torch.nn.functional import adaptive_avg_pool2d
 from torch.utils.data import DataLoader, TensorDataset
@@ -42,13 +15,13 @@ except ImportError:
     def tqdm(x):
         return x
 
-from weighted_retraining.inception import InceptionV3
+from src.fid.inception import InceptionV3
 
 
-def get_activations(array, model, batch_size=50, dims=2048, device='cpu', num_workers=8):
+def get_activations(data, model, batch_size=50, dims=2048, device='cpu', num_workers=8):
     """Calculates the activations of the pool_3 layer for all images.
     Params:
-    -- files       : List of image files paths
+    -- data        : Either an np.ndarray that contains image data or a datamodule
     -- model       : Instance of inception model
     -- batch_size  : Batch size of images for the model to process at once.
                      Make sure that the number of samples is a multiple of
@@ -65,24 +38,28 @@ def get_activations(array, model, batch_size=50, dims=2048, device='cpu', num_wo
     """
     model.eval()
 
-    if batch_size > array.shape[0]:
-        print(('Warning: batch size is bigger than the data size. '
-               'Setting batch size to data size'))
-        batch_size = array.shape[0]
+    if isinstance(data, np.ndarray):
+        if batch_size > data.shape[0]:
+            print(('Warning: batch size is bigger than the data size. '
+                   'Setting batch size to data size'))
+            batch_size = data.shape[0]
 
-    data = torch.as_tensor(array, dtype=torch.float)
+        data = torch.as_tensor(data, dtype=torch.float)
 
-    if data.ndim < 4:
-        data = data.unsqueeze(1) # insert dimension for number of channels in image
-    data = TensorDataset(data)
+        if data.ndim < 4:
+            data = data.unsqueeze(1) # insert dimension for number of channels in image
+        tensor_data = TensorDataset(data)
 
-    dataloader = torch.utils.data.DataLoader(data,
-                                             batch_size=batch_size,
-                                             shuffle=False,
-                                             drop_last=False,
-                                             num_workers=num_workers)
+        dataloader = torch.utils.data.DataLoader(tensor_data,
+                                                 batch_size=batch_size,
+                                                 shuffle=False,
+                                                 drop_last=False,
+                                                 num_workers=num_workers)
 
-    pred_arr = np.empty((array.shape[0], dims))
+        pred_arr = np.empty((data.shape[0], dims))
+    else:
+        dataloader = data
+        pred_arr = np.empty((data.dataset.__len__(), dims))
 
     start_idx = 0
 
@@ -160,11 +137,11 @@ def calculate_frechet_distance(mu1, sigma1, mu2, sigma2, eps=1e-6):
             + np.trace(sigma2) - 2 * tr_covmean)
 
 
-def calculate_activation_statistics(array, model, batch_size=50, dims=2048,
+def calculate_activation_statistics(data, model, batch_size=50, dims=2048,
                                     device='cpu', num_workers=2):
     """Calculation of the statistics used by the FID.
     Params:
-    -- files       : List of image files paths
+    -- data        : Either an np.ndarray that contains image data or a datamodule
     -- model       : Instance of inception model
     -- batch_size  : The images numpy array is split into batches with
                      batch size batch_size. A reasonable batch size
@@ -178,21 +155,21 @@ def calculate_activation_statistics(array, model, batch_size=50, dims=2048,
     -- sigma : The covariance matrix of the activations of the pool_3 layer of
                the inception model.
     """
-    act = get_activations(array, model, batch_size, dims, device, num_workers)
+    act = get_activations(data, model, batch_size, dims, device, num_workers)
     mu = np.mean(act, axis=0)
     sigma = np.cov(act, rowvar=False)
     return mu, sigma
 
 
-def calculate_fid_given_arrays(arr1, arr2, batch_size, device, dims, num_workers=2, is_one_channel=True):
-    """Calculates the FID of two paths"""
+def calculate_fid_given_tensors(data1, data2, batch_size, device, dims, num_workers=2, is_one_channel=False):
+    """ Calculates the FID between two sets of images """
     block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[dims]
 
     model = InceptionV3(output_blocks=[block_idx], is_one_channel=is_one_channel).to(device)
 
-    m1, s1 = calculate_activation_statistics(arr1, model, batch_size,
+    m1, s1 = calculate_activation_statistics(data1, model, batch_size,
                                              dims, device, num_workers)
-    m2, s2 = calculate_activation_statistics(arr2, model, batch_size,
+    m2, s2 = calculate_activation_statistics(data2, model, batch_size,
                                              dims, device, num_workers)
     fid_value = calculate_frechet_distance(m1, s1, m2, s2)
 
