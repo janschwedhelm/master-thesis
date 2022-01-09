@@ -23,7 +23,7 @@ All code was designed to be run on a single GPU using Google Colab. For that, th
 
 Data, pretrained models and optimization results can be downloaded using the following link: https://drive.google.com/drive/folders/12mSO8DsnBUBvsV0_zfJrHfpsyI3Vp-iw?usp=sharing.
 
-The folders `data` and `logs` should then be uploaded to the Google Drive root directory of this repository.
+The folders `data` and `logs` must be uploaded to the Google Drive root directory of this repository.
 
 ### Training Models
 
@@ -38,7 +38,7 @@ The default parameters for all models are the ones used in the thesis. Due to di
 
 ### Run Weighted Retraining Experiments
 
-**Note:** This section is optional, since all results are provided under `logs/opt` using the above Google Drive link. To run the VQ-VAE experiments, the folders `entmoot` and `LightGBM` (see provided Google Drive link) contain the necessary code. Thus, they should be uploaded to the Google Drive root directory of this repository in advance.
+**Note:** This section is optional, since all results are provided under `logs/opt` using the above Google Drive link. To run the VQ-VAE experiments, the folders `entmoot` and `LightGBM` (see provided Google Drive link) contain the necessary code. Thus, they must be uploaded to the Google Drive root directory of this repository in that case.
 
 To run the core weighted retraining experiments:
 
