@@ -2,6 +2,7 @@ import numpy as np
 import pytorch_lightning as pl
 import argparse
 import pickle
+import time
 from pathlib import Path
 
 from src.fid.fid_score import calculate_fid_given_tensors
@@ -42,12 +43,17 @@ def main(args):
     dataloader = datamodule.train_dataloader()
 
     print("Start FID computation")
+
+    start_time = time.time()
     fid_score = calculate_fid_given_tensors(samples, dataloader, args.batch_size,
                                             device, dims=DIMS, num_workers=NUM_WORKERS)
+    time_needed = time.time() - start_time
     results = dict(test_set=args.sample_path,
-                   fid_score=fid_score)
+                   fid_score=fid_score,
+                   time=time_needed)
 
     print(f"Resulting FID score: {fid_score}")
+    print(f"Time needed: {time_needed} seconds")
 
     # if "normal" in args.sampling_method:
     #     print("Start 'normal' sampling")
