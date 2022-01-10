@@ -21,7 +21,7 @@ from src.fid.inception import InceptionV3
 def get_activations(data, model, batch_size=50, dims=2048, device='cpu', num_workers=8):
     """Calculates the activations of the pool_3 layer for all images.
     Params:
-    -- data        : Either an np.ndarray that contains image data or a datamodule
+    -- data        : Either an np.ndarray that contains image data, a tensor or a datamodule
     -- model       : Instance of inception model
     -- batch_size  : Batch size of images for the model to process at once.
                      Make sure that the number of samples is a multiple of
@@ -45,6 +45,23 @@ def get_activations(data, model, batch_size=50, dims=2048, device='cpu', num_wor
             batch_size = data.shape[0]
 
         data = torch.as_tensor(data, dtype=torch.float)
+
+        if data.ndim < 4:
+            data = data.unsqueeze(1) # insert dimension for number of channels in image
+        tensor_data = TensorDataset(data)
+
+        dataloader = torch.utils.data.DataLoader(tensor_data,
+                                                 batch_size=batch_size,
+                                                 shuffle=False,
+                                                 drop_last=False,
+                                                 num_workers=num_workers)
+
+        pred_arr = np.empty((data.shape[0], dims))
+    elif isinstance(data, torch.Tensor):
+        if batch_size > data.shape[0]:
+            print(('Warning: batch size is bigger than the data size. '
+                   'Setting batch size to data size'))
+            batch_size = data.shape[0]
 
         if data.ndim < 4:
             data = data.unsqueeze(1) # insert dimension for number of channels in image
