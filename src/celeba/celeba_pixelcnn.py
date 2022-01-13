@@ -147,7 +147,7 @@ class GatedPixelCNN(pl.LightningModule):
     def forward(self, x):
         # requires input shape (B, H, W)
         shp = x.size() + (-1, ) # (B, H, W, -1)
-        x = self.embedding(x.view(-1)).view(shp)  # (B, H, W, C) -> C = dim
+        x = self.embedding(x.reshape(-1)).reshape(shp)  # (B, H, W, C) -> C = dim
         x = x.permute(0, 3, 1, 2)  # (B, C, H, W)
 
         x_v, x_h = (x, x)
@@ -161,7 +161,7 @@ class GatedPixelCNN(pl.LightningModule):
                       latents):
         logits = self(latents)
         loss = logits.permute(0, 2, 3, 1).contiguous()
-        loss = torch.nn.functional.cross_entropy(logits.view(-1, self.input_dim), latents.view(-1))
+        loss = torch.nn.functional.cross_entropy(logits.reshape(-1, self.input_dim), latents.reshape(-1))
         if self.logging_prefix is not None:
             self.log(f"loss/{self.logging_prefix}", loss)
         return loss
@@ -170,7 +170,7 @@ class GatedPixelCNN(pl.LightningModule):
         self.logging_prefix = "train"
         self.log_progress_bar = True
         discrete_latents = self.vq_vae.encode_to_latent_space(batch[0])
-        discrete_latents = discrete_latents.view(-1, 8, 8)
+        discrete_latents = discrete_latents.reshape(-1, 8, 8)
         train_loss = self.loss_function(discrete_latents)
         self.logging_prefix = None
         self.log_progress_bar = False
@@ -180,7 +180,7 @@ class GatedPixelCNN(pl.LightningModule):
         self.logging_prefix = "val"
         self.log_progress_bar = True
         discrete_latents = self.vq_vae.encode_to_latent_space(batch[0])
-        discrete_latents = discrete_latents.view(-1, 8, 8)
+        discrete_latents = discrete_latents.reshape(-1, 8, 8)
         val_loss = self.loss_function(discrete_latents)
         self.logging_prefix = None
         self.log_progress_bar = False
