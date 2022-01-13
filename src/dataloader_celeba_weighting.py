@@ -14,6 +14,7 @@ class CelebaWeightedTensorDataset(pl.LightningDataModule):
         self.tensor_dir = hparams.tensor_dir
         self.property_id = hparams.property_id
         self.max_property_value = hparams.max_property_value
+        self.min_property_value = hparams.min_property_value
         self.batch_size = hparams.batch_size
         self.train_attr_path = hparams.train_attr_path
         self.val_attr_path = hparams.val_attr_path
@@ -41,7 +42,12 @@ class CelebaWeightedTensorDataset(pl.LightningDataModule):
         data_group.add_argument(
             "--max_property_value",
             type=int,
-            default=2,
+            default=5,
+        )
+        data_group.add_argument(
+            "--min_property_value",
+            type=int,
+            default=0,
         )
         data_group.add_argument(
             "--train_attr_path", type=str,
@@ -71,9 +77,11 @@ class CelebaWeightedTensorDataset(pl.LightningDataModule):
     def setup(self, stage):
         if self.mode == "split":
             train_dataset = CelebA(self.filename_set_path, self.tensor_dir, self.train_attr_path, mode='train',
-                             attribute_id=self.property_id, max_property_value=self.max_property_value)
+                             attribute_id=self.property_id, max_property_value=self.max_property_value,
+                             min_property_value=self.min_property_value)
             val_dataset = CelebA(self.filename_set_path, self.tensor_dir, self.val_attr_path, mode='val',
-                             attribute_id=self.property_id, max_property_value=self.max_property_value)
+                             attribute_id=self.property_id, max_property_value=self.max_property_value,
+                             min_property_value=self.min_property_value)
 
             train_dataset_as_numpy = np.array(train_dataset.train_dataset)
             val_dataset_as_numpy = np.array(val_dataset.val_dataset)
@@ -83,7 +91,8 @@ class CelebaWeightedTensorDataset(pl.LightningDataModule):
             self.prop_train = train_dataset_as_numpy[:, 1].astype(np.float32)
         elif self.mode == "all":
              full_dataset = CelebA(self.filename_set_path, self.tensor_dir, self.combined_annotation_path, mode='all',
-                                   attribute_id=self.property_id, max_property_value=self.max_property_value)
+                                   attribute_id=self.property_id, max_property_value=self.max_property_value,
+                                   min_property_value=self.min_property_value)
 
              full_dataset_as_numpy = np.array(full_dataset.full_dataset)
              self.data_train = full_dataset_as_numpy[:, 0].tolist()
