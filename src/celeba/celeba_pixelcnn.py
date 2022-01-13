@@ -2,6 +2,11 @@
 
 import torch
 import torch.nn as nn
+import numpy as np
+import argparse
+import pytorch_lightning as pl
+
+from src.celeba.celeba_vqvae_64 import *
 
 
 def weights_init(m):
@@ -81,50 +86,115 @@ class GatedMaskedConv2d(nn.Module):
         return out_v, out_h
 
 
-class GatedPixelCNN(nn.Module):
-    def __init__(self, input_dim=256, dim=64, n_layers=15, n_classes=10):
+class GatedPixelCNN(pl.LightningModule):
+    #def __init__(self, hparams, input_dim=256, dim=64, n_layers=15, n_classes=10):
+    def __init__(self, hparams):
         super().__init__()
-        self.dim = dim
+        self.hparams = hparams
+        self.save_hyperparameters()
+
+        self.dim = hparams.dim
+        self.input_dim = hparams.input_dim
+        self.n_layers = hparams.n_layers
+        self.vqvae_path = hparams.vqvae_path
 
         # Create embedding layer to embed input
-        self.embedding = nn.Embedding(input_dim, dim)
+        self.embedding = nn.Embedding(self.input_dim, self.dim)
 
         # Building the PixelCNN layer by layer
         self.layers = nn.ModuleList()
 
         # Initial block with Mask-A convolution
         # Rest with Mask-B convolutions
-        for i in range(n_layers):
+        for i in range(self.n_layers):
             mask_type = 'A' if i == 0 else 'B'
             kernel = 7 if i == 0 else 3
             residual = False if i == 0 else True
 
             self.layers.append(
-                GatedMaskedConv2d(mask_type, dim, kernel, residual, n_classes)
+                #GatedMaskedConv2d(mask_type, self.dim, kernel, residual, n_classes)
+                GatedMaskedConv2d(mask_type, self.dim, kernel, residual)
             )
 
         # Add the output layer
         self.output_conv = nn.Sequential(
-            nn.Conv2d(dim, 512, 1),
+            nn.Conv2d(self.dim, 512, 1),
             nn.ReLU(True),
-            nn.Conv2d(512, input_dim, 1)
+            nn.Conv2d(512, self.input_dim, 1)
         )
 
         self.apply(weights_init)
 
+        # load corresponding VQ-VAE model and freeze parameters
+        self.vq_vae = CelebaVQVAE.load_from_checkpoint(self.vqvae_path)
+        for p in self.vq_vae.parameters():
+            p.requires_grad = False
+        self.vq_vae.eval()
+
+    @staticmethod
+    def add_model_specific_args(parent_parser):
+        parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
+
+        pixelcnn_group = parser.add_argument_group("PixelCNN")
+        pixelcnn_group.add_argument("--vqvae_path", type=str, required=True)
+        pixelcnn_group.add_argument("--lr", type=float, default=3e-4)
+        pixelcnn_group.add_argument("--input_dim", type=int, default=256)
+        pixelcnn_group.add_argument("--dim", type=int, default=64)
+        pixelcnn_group.add_argument("--n_layers", type=int, default=15)
+        return parser
+
     #def forward(self, x, label):
-    def forward(self, x, label):
-        shp = x.size() + (-1, )
-        x = self.embedding(x.view(-1)).view(shp)  # (B, H, W, C)
+    def forward(self, x):
+        # requires input shape (B, H, W)
+        shp = x.size() + (-1, ) # (B, H, W, -1)
+        x = self.embedding(x.view(-1)).view(shp)  # (B, H, W, C) -> C = dim
         x = x.permute(0, 3, 1, 2)  # (B, C, H, W)
 
         x_v, x_h = (x, x)
         for i, layer in enumerate(self.layers):
-            x_v, x_h = layer(x_v, x_h, label)
+            #x_v, x_h = layer(x_v, x_h, label)
+            x_v, x_h = layer(x_v, x_h)
 
         return self.output_conv(x_h)
 
-    def generate(self, label, shape=(8, 8), batch_size=64):
+    def loss_function(self,
+                      latents):
+        logits = self(latents)
+        loss = logits.permute(0, 2, 3, 1).contiguous()
+        loss = torch.nn.functional.cross_entropy(logits.view(-1, self.input_dim), latents.view(-1))
+        if self.logging_prefix is not None:
+            self.log(f"loss/{self.logging_prefix}", loss)
+        return loss
+
+    def training_step(self, batch, batch_idx):
+        self.logging_prefix = "train"
+        self.log_progress_bar = True
+        #results = self(batch[0])
+        discrete_latents = self.vq_vae(batch[0])
+        discrete_latents = discrete_latents.view(-1, 8, 8)
+        train_loss = self.loss_function(discrete_latents)
+        self.logging_prefix = None
+        self.log_progress_bar = False
+
+        return train_loss
+
+    def validation_step(self, batch, batch_idx):
+        self.logging_prefix = "val"
+        self.log_progress_bar = True
+        #results = self(batch[0])
+        discrete_latents = self.vq_vae(batch[0])
+        discrete_latents = discrete_latents.view(-1, 8, 8)
+        val_loss = self.loss_function(discrete_latents)
+        self.logging_prefix = None
+        self.log_progress_bar = False
+
+        return val_loss
+
+    def configure_optimizers(self):
+        return torch.optim.Adam(filter(lambda p: p.requires_grad, self.parameters()), lr=self.hparams.lr)
+
+    #def generate(self, label, shape=(8, 8), batch_size=64):
+    def generate(self, shape=(8, 8), batch_size=64):
         param = next(self.parameters())
         x = torch.zeros(
             (batch_size, *shape),
