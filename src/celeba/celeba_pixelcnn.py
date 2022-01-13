@@ -169,20 +169,17 @@ class GatedPixelCNN(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         self.logging_prefix = "train"
         self.log_progress_bar = True
-        #results = self(batch[0])
-        discrete_latents = self.vq_vae(batch[0])
+        discrete_latents = self.vq_vae.encode_to_latent_space(batch[0])
         discrete_latents = discrete_latents.view(-1, 8, 8)
         train_loss = self.loss_function(discrete_latents)
         self.logging_prefix = None
         self.log_progress_bar = False
-
         return train_loss
 
     def validation_step(self, batch, batch_idx):
         self.logging_prefix = "val"
         self.log_progress_bar = True
-        #results = self(batch[0])
-        discrete_latents = self.vq_vae(batch[0])
+        discrete_latents = self.vq_vae.encode_to_latent_space(batch[0])
         discrete_latents = discrete_latents.view(-1, 8, 8)
         val_loss = self.loss_function(discrete_latents)
         self.logging_prefix = None

@@ -7,12 +7,12 @@ root_dir="logs/train"
 celeba_data_path="data/celeba-dialog"
 
 # Train shapes VAE
-  python src/train_scripts/train_celeba_vqvae.py \
+  python src/train_scripts/train_celeba_pixelcnn.py \
       --root_dir="$root_dir/celeba/pixelcnn" \
       --seed="$seed" $gpu \
       --input_dim=256 \
       --dim=64 \
-      --tensor_dir="/content/data_tensors_64" \
+      --tensor_dir="data/celeba-dialog/data_tensors_64" \
       --property_id=3 \
       --max_property_value=5 \
       --min_property_value=0 \
@@ -25,4 +25,4 @@ celeba_data_path="data/celeba-dialog"
       --mode="all" \
       --batch_size=128 \
       --n_layers=15 \
-      --vq_vae="$root_dir/celeba/vq-vae/lightning_logs/version_0/checkpoints/last.ckpt"
+      --vqvae_path="$root_dir/celeba/vq-vae/lightning_logs/version_0/checkpoints/last.ckpt"
