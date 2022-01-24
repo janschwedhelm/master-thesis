@@ -71,4 +71,7 @@ def add_gp_args(parser: ArgumentParser):
     gp_group.add_argument("--n_best_points", type=int, default=2000)
     gp_group.add_argument("--sample_distribution", type=str, default="normal")
     gp_group.add_argument("--ground_truth_discriminator_threshold", type=float, default=0.0)
+    gp_group.add_argument("--M", type=int, default=10)
+    gp_group.add_argument("--M_0", type=int, default=100)
+    gp_group.add_argument("--N", type=int, default=1000)
     return parser
