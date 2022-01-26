@@ -10,7 +10,8 @@ from src.utils import rounddown
 class CelebA(data.Dataset):
     """Dataset class for the CelebA dataset."""
 
-    def __init__(self, filename_set_path, data_dir, attr_path, mode, attribute_id=None, max_property_value=5):
+    def __init__(self, filename_set_path, data_dir, attr_path, mode, attribute_id=None, max_property_value=5,
+                 min_property_value=0):
         """Initialize and preprocess the CelebA dataset."""
         self.data_dir = data_dir
         self.filename_set_path = filename_set_path
@@ -22,6 +23,7 @@ class CelebA(data.Dataset):
         self.full_dataset = []
         self.attribute_id = attribute_id
         self.max_property_value = max_property_value
+        self.min_property_value = min_property_value
 
         self.preprocess()
 
@@ -55,16 +57,16 @@ class CelebA(data.Dataset):
 
             if filename in filename_set:
                 if self.mode == "train":
-                    if self.attribute_id is None or targets <= self.max_property_value:
+                    if self.attribute_id is None or (targets <= self.max_property_value) & (targets >= self.min_property_value):
                         self.train_dataset.append([filename, targets])
                 if self.mode == "val":
-                    if self.attribute_id is None or targets <= self.max_property_value:
+                    if self.attribute_id is None or (targets <= self.max_property_value) & (targets >= self.min_property_value):
                         self.val_dataset.append([filename, targets])
                 if self.mode == "all":
-                    if self.attribute_id is None or targets <= self.max_property_value:
+                    if self.attribute_id is None or (targets <= self.max_property_value) & (targets >= self.min_property_value):
                         self.full_dataset.append([filename, targets])
                 else:
-                    if self.attribute_id is None or targets <= self.max_property_value:
+                    if self.attribute_id is None or (targets <= self.max_property_value) & (targets >= self.min_property_value):
                         self.test_dataset.append([filename, targets])
 
         print('Finished preprocessing the CelebA dataset...')

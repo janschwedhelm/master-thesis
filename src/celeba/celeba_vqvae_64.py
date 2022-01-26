@@ -179,7 +179,7 @@ class CelebaVQVAE(pl.LightningModule):
         vqvae_group = parser.add_argument_group("VQ-VAE")
         vqvae_group.add_argument("--lr", type=float, default=1e-3)
         vqvae_group.add_argument("--beta", type=float, default=0.25)
-        vqvae_group.add_argument("--num_embeddings", type=int, default=512)
+        vqvae_group.add_argument("--num_embeddings", type=int, default=256)
         vqvae_group.add_argument("--embedding_dim", type=int, default=64)
         return parser
 
@@ -211,11 +211,6 @@ class CelebaVQVAE(pl.LightningModule):
 
     def loss_function(self,
                       results):
-        """
-        :param args:
-        :param kwargs:
-        :return:
-        """
         recons = results[0]
         input = results[1]
         vq_loss = results[2]
