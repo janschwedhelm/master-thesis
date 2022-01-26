@@ -108,16 +108,17 @@ class Encoder(nn.Module):
                 nn.Conv2d(in_channel, channel // 2, 4, stride=2, padding=1),
                 nn.ReLU(inplace=True),
                 nn.Conv2d(channel // 2, channel, 4, stride=2, padding=1),
+                #nn.Conv2d(channel // 2, channel, 3, padding=1),
                 nn.ReLU(inplace=True),
                 nn.Conv2d(channel, channel, 3, padding=1),
-            ] # enc_b: 128x16x16
+            ] # enc_b: 128x16x16 (128x32x32)
 
         elif stride == 2:
             blocks = [
                 nn.Conv2d(in_channel, channel // 2, 4, stride=2, padding=1),
                 nn.ReLU(inplace=True),
                 nn.Conv2d(channel // 2, channel, 3, padding=1),
-            ] # enc_t: 128x8x8
+            ] # enc_t: 128x8x8 (128x16x16)
 
         for i in range(n_res_block):
             blocks.append(ResBlock(channel, n_res_channel))
@@ -148,6 +149,7 @@ class Decoder(nn.Module):
             blocks.extend(
                 [
                     nn.ConvTranspose2d(channel, channel // 2, 4, stride=2, padding=1),  # 64x32x32
+                    #nn.ConvTranspose2d(channel, channel // 2, 3, padding=1),  # 64x32x32
                     nn.ReLU(inplace=True),
                     nn.ConvTranspose2d(
                         channel // 2, out_channel, 4, stride=2, padding=1  # 3x64x64
@@ -201,6 +203,7 @@ class CelebaVQVAE2(pl.LightningModule):
     def forward(self, input):
         quant_t, quant_b, diff, _, _ = self.encode(input)
         dec = self.decode(quant_t, quant_b)
+        dec = torch.sigmoid(dec)
 
         return dec, diff
 

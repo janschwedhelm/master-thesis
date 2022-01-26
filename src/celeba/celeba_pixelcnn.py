@@ -1,4 +1,4 @@
-""" Borrowed from https://github.com/ritheshkumar95/pytorch-vqvae """
+""" Borrowed from https://github.com/ritheshkumar95/pytorch-vqvae, made unconditional and ported to Pytorch Lightning """
 
 import torch
 import torch.nn as nn
