@@ -13,8 +13,8 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 import argparse
+import pytorch_lightning as pl
 from src.celeba.celeba_vqvae2 import *
-
 
 
 def wn_linear(in_dim, out_dim):
@@ -326,40 +326,47 @@ class CondResNet(nn.Module):
         return self.blocks(input)
 
 
-class PixelSNAIL(nn.Module):
+class PixelSNAIL(pl.LightningModule):
     def __init__(
         self,
-        shape,
-        n_class, # 512, number of categories
-        channel,
-        kernel_size,
-        n_block,
-        n_res_block,
-        res_channel,
-        attention=True,
-        dropout=0.1,
-        n_cond_res_block=0,
-        cond_res_channel=0,
-        cond_res_kernel=3,
-        n_out_res_block=0,
+        hparams,
+        attention=True
     ):
         super().__init__()
+        self.hparams = hparams
+        self.save_hyperparameters()
 
-        height, width = shape
+        self.vqvae2_path = hparams.vqvae2_path
+        self.lr = hparams.lr
+        self.hier = hparams.hier
+        self.channel = hparams.channel
+        self.n_res_block = hparams.n_res_block
+        self.res_channel = hparams.res_channel
+        self.n_out_res_block = hparams.n_out_res_block
+        self.n_cond_res_block = hparams.n_cond_res_block
+        self.dropout = hparams.dropout
+        self.shape = hparams.shape
+        self.n_class = hparams.n_class
+        self.kernel_size = hparams.kernel_size
+        self.n_block = hparams.n_block
+        self.cond_res_channel = hparams.cond_res_channel
+        self.cond_res_kernel = hparams.cond_res_kernel
 
-        self.n_class = n_class
+        height, width = [self.shape, self.shape]
 
-        if kernel_size % 2 == 0:
-            kernel = kernel_size + 1
+        self.n_class = self.n_class
+
+        if self.kernel_size % 2 == 0:
+            kernel = self.kernel_size + 1
 
         else:
-            kernel = kernel_size
+            kernel = self.kernel_size
 
         self.horizontal = CausalConv2d(
-            n_class, channel, [kernel // 2, kernel], padding='down'
+            self.n_class, self.channel, [kernel // 2, kernel], padding='down'
         )
         self.vertical = CausalConv2d(
-            n_class, channel, [(kernel + 1) // 2, kernel // 2], padding='downright'
+            self.n_class, self.channel, [(kernel + 1) // 2, kernel // 2], padding='downright'
         )
 
         coord_x = (torch.arange(height).float() - height / 2) / height
@@ -370,30 +377,30 @@ class PixelSNAIL(nn.Module):
 
         self.blocks = nn.ModuleList()
 
-        for i in range(n_block):
+        for i in range(self.n_block):
             self.blocks.append(
                 PixelBlock(
-                    channel,
-                    res_channel,
-                    kernel_size,
-                    n_res_block,
+                    self.channel,
+                    self.res_channel,
+                    self.kernel_size,
+                    self.n_res_block,
                     attention=attention,
-                    dropout=dropout,
-                    condition_dim=cond_res_channel,
+                    dropout=self.dropout,
+                    condition_dim=self.cond_res_channel,
                 )
             )
 
-        if n_cond_res_block > 0:
+        if self.n_cond_res_block > 0:
             self.cond_resnet = CondResNet(
-                n_class, cond_res_channel, cond_res_kernel, n_cond_res_block
+                self.n_class, self.cond_res_channel, self.cond_res_kernel, self.n_cond_res_block
             )
 
         out = []
 
-        for i in range(n_out_res_block):
-            out.append(GatedResBlock(channel, res_channel, 1))
+        for i in range(self.n_out_res_block):
+            out.append(GatedResBlock(self.channel, self.res_channel, 1))
 
-        out.extend([nn.ELU(inplace=True), WNConv2d(channel, n_class, 1)])
+        out.extend([nn.ELU(inplace=True), WNConv2d(self.channel, self.n_class, 1)])
 
         self.out = nn.Sequential(*out)
 
@@ -410,19 +417,19 @@ class PixelSNAIL(nn.Module):
         pixelsnail_group = parser.add_argument_group("PixelSNAIL")
         pixelsnail_group.add_argument("--vqvae2_path", type=str, required=True)
         pixelsnail_group.add_argument("--lr", type=float, default=3e-4)
-        pixelsnail_group.add_argument('--batch', type=int, default=32)
-        pixelsnail_group.add_argument('--epoch', type=int, default=420)
         pixelsnail_group.add_argument('--hier', type=str, default='top')
         pixelsnail_group.add_argument('--channel', type=int, default=256)
-        pixelsnail_group.add_argument('--n_res_block', type=int, default=4)
-        pixelsnail_group.add_argument('--n_res_channel', type=int, default=256)
+        pixelsnail_group.add_argument('--n_res_block', type=int, default=8)
+        pixelsnail_group.add_argument('--res_channel', type=int, default=512)
         pixelsnail_group.add_argument('--n_out_res_block', type=int, default=0)
-        pixelsnail_group.add_argument('--n_cond_res_block', type=int, default=3)
+        pixelsnail_group.add_argument('--n_cond_res_block', type=int, default=0)
         pixelsnail_group.add_argument('--dropout', type=float, default=0.1)
-        #pixelsnail_group.add_argument('--amp', type=str, default='O0')
-        #pixelsnail_group.add_argument('--sched', type=str)
-        #pixelsnail_group.add_argument('--ckpt', type=str)
-        #pixelsnail_group.add_argument('path', type=str)
+        pixelsnail_group.add_argument('--shape', type=int, default=16)
+        pixelsnail_group.add_argument('--n_class', type=int, default=512)
+        pixelsnail_group.add_argument('--kernel_size', type=int, default=5)
+        pixelsnail_group.add_argument('--n_block', type=int, default=4)
+        pixelsnail_group.add_argument('--cond_res_channel', type=int, default=0)
+        pixelsnail_group.add_argument('--cond_res_kernel', type=int, default=3)
         return parser
 
     def forward(self, input, condition=None, cache=None):
