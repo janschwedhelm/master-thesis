@@ -419,7 +419,7 @@ class PixelSNAIL(pl.LightningModule):
         pixelsnail_group.add_argument("--lr", type=float, default=3e-4)
         pixelsnail_group.add_argument('--hier', type=str, default='top')
         pixelsnail_group.add_argument('--channel', type=int, default=256)
-        pixelsnail_group.add_argument('--n_res_block', type=int, default=8)
+        pixelsnail_group.add_argument('--n_res_block', type=int, default=4)
         pixelsnail_group.add_argument('--res_channel', type=int, default=512)
         pixelsnail_group.add_argument('--n_out_res_block', type=int, default=0)
         pixelsnail_group.add_argument('--n_cond_res_block', type=int, default=0)
@@ -472,12 +472,18 @@ class PixelSNAIL(pl.LightningModule):
                       latents_t, latents_b):
         if self.hier == 'top':
             logits, _ = self(latents_t)
-            loss = torch.nn.functional.cross_entropy(logits, latents_t)
+            target = latents_t
+            loss = torch.nn.functional.cross_entropy(logits, target)
         elif self.hier == 'bottom':
             logits, _ = self(latents_b, condition=latents_t)
-            loss = torch.nn.functional.cross_entropy(logits, latents_b)
+            target = latents_b
+            loss = torch.nn.functional.cross_entropy(logits, target)
         if self.logging_prefix is not None:
             self.log(f"loss/{self.logging_prefix}", loss)
+            _, pred = logits.max(1)
+            correct = (pred == target).float()
+            accuracy = correct.sum() / target.numel()
+            self.log(f"acc/{self.logging_prefix}", accuracy)
         return loss
 
     def training_step(self, batch, batch_idx):

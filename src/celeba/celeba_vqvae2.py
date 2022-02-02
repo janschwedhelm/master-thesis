@@ -240,6 +240,9 @@ class CelebaVQVAE2(pl.LightningModule):
         quant_b = quant_b.permute(0, 3, 1, 2)
 
         dec = self.decode(quant_t, quant_b)
+        print(dec.max())
+        dec = torch.sigmoid(dec)
+        print(dec.max())
 
         return dec
 
@@ -301,34 +304,3 @@ class CelebaVQVAE2(pl.LightningModule):
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=self.hparams.lr)
-
-    # def reconstruct(self, x):
-    #     """
-    #     Given an input image x, returns the reconstructed image
-    #     :param x: (Tensor) [B x C x H x W]
-    #     :return: (Tensor) [B x C x H x W]
-    #     """
-    #
-    #     return self(x)[0]
-    #
-    # def encode_to_latent_space(self, x):
-    #     """ encode data from the original input space to latent space """
-    #     latents = self.encode(x)[0]
-    #
-    #     latents, z = self.vq_layer.encode_latents_to_discrete_latent_space(latents)
-    #
-    #     return z
-    #
-    # def decode_deterministic(self, z: torch.Tensor) -> torch.Tensor:
-    #
-    #     z_rearr = z.view(-1, 1)
-    #     # Convert to one-hot encodings
-    #     encoding_one_hot = torch.zeros(z_rearr.shape[0], self.num_embeddings, device=self.device)
-    #     encoding_one_hot.scatter_(1, z_rearr, 1)  # [BHW x K]
-    #
-    #     # Quantize the latents
-    #     quantized_latents = torch.matmul(encoding_one_hot, self.vq_layer.embedding.weight) # [BHW, D]
-    #     quantized_latents = quantized_latents.view((z.shape[0], 8, 8, self.embedding_dim))  # [B x H x W x D]
-    #     x = self.decode(quantized_latents.permute(0, 3, 1, 2).contiguous())
-    #
-    #     return x
