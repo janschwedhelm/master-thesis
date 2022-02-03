@@ -158,6 +158,7 @@ def entmoot_train_opt(
             raise ValueError("`x0` and `y0` should have the same length")
         LOGGER.info("Start initial model fitting")
         start_time = time.time()
+
         result = optimizer.tell(x0, y0)
         end_time = time.time()
         LOGGER.info(f"Initial model fitting took {end_time - start_time:.1f}s to finish")
@@ -300,7 +301,7 @@ if __name__ == "__main__":
         random_state=1,
         acq_func_kwargs=None,
         acq_optimizer_kwargs={'gurobi_timelimit': 2*60},
-        base_estimator_kwargs={'n_estimators': 800, 'min_child_samples': 20, 'max_depth': 2, 'num_leaves': 5, 'device': 'gpu'},
+        base_estimator_kwargs={'n_estimators': 800, 'min_child_samples': 20, 'max_depth': 2, 'num_leaves': 5, 'device': 'cpu'},
         std_estimator_kwargs=None,
         model_queue_size=None,
         verbose=1,

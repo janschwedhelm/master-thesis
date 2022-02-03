@@ -23,6 +23,7 @@ def add_common_args(parser: ArgumentParser):
     opt_group.add_argument("--pretrained_predictor_file", type=str, default=None)
     opt_group.add_argument("--scaled_predictor_state_dict", type=str, default=None)
     opt_group.add_argument("--attr_file", type=str, default=None)
+    opt_group.add_argument("--pixelsnail_bottom_file", type=str, default=None)
     opt_group.add_argument("--n_retrain_epochs", type=float, default=1.0)
     opt_group.add_argument("--n_init_retrain_epochs", type=float, default=None, help="None to use n_retrain_epochs, 0.0 to skip init retrain")
 

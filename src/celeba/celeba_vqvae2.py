@@ -240,9 +240,7 @@ class CelebaVQVAE2(pl.LightningModule):
         quant_b = quant_b.permute(0, 3, 1, 2)
 
         dec = self.decode(quant_t, quant_b)
-        print(dec.max())
         dec = torch.sigmoid(dec)
-        print(dec.max())
 
         return dec
 
