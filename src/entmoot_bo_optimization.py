@@ -1,7 +1,11 @@
 """ Code to train tree-based model as surrogate model and to deterministically solve resulting MIO """
 
 from entmoot.optimizer.optimizer import Optimizer
+from entmoot.space.space import Space
+from entmoot.optimizer.gurobi_utils import get_core_gurobi_model
 from src.celeba_obj_function import *
+from src.opt_scripts.opt_celeba_vqvae2 import sample_model
+from sklearn.base import clone
 
 import copy
 import inspect
@@ -48,6 +52,16 @@ parser.add_argument(
     required=True
 )
 parser.add_argument(
+    "--pixelsnail_top_file",
+    type=str,
+    required=True
+)
+parser.add_argument(
+    "--pixelsnail_bottom_file",
+    type=str,
+    required=True
+)
+parser.add_argument(
     "--n_out",
     type=int,
     default=5,
@@ -55,10 +69,11 @@ parser.add_argument(
 )
 
 
-
 def entmoot_train_opt(
         data_file,
         save_file,
+        pixelsnail_top_file,
+        pixelsnail_bottom_file,
         func,
         dimensions,
         logfile="entmoot_train.log",
@@ -82,6 +97,9 @@ def entmoot_train_opt(
     """ function to perform deterministic optimization with trained tree-based model """
     specs = {"args": copy.copy(inspect.currentframe().f_locals),
              "function": inspect.currentframe().f_code.co_name}
+
+    pixelsnail_bottom = PixelSNAIL.load_from_checkpoint(pixelsnail_bottom_file)
+    pixelsnail_top = PixelSNAIL.load_from_checkpoint(pixelsnail_top_file)
 
     if acq_optimizer_kwargs is None:
         acq_optimizer_kwargs = {}
@@ -179,6 +197,22 @@ def entmoot_train_opt(
             raise TypeError("if verbose is int, it should in [0,1,2], "
                             "got {}".format(verbose))
 
+    #specs = {"args": copy.copy(inspect.currentframe().f_locals),
+    #         "function": inspect.currentframe().f_code.co_name}
+
+    # initialize the search space manually
+    #space = Space(func.get_bounds())
+
+    # get the core of the gurobi model from helper function 'get_core_gurobi_model'
+    #core_model = get_core_gurobi_model(space)
+
+    #core_model.update()
+
+    #opt.acq_optimizer_kwargs['add_model_core'] = core_model
+    #opt.update_next()
+
+    #result = None
+
     # Optimize
     _n_calls = n_calls
 
@@ -192,6 +226,27 @@ def entmoot_train_opt(
 
     while _n_calls > 0:
 
+        top_sample = sample_model(pixelsnail_top, pixelsnail_top.device, 1, [8, 8], 1)
+        bottom_sample = sample_model(pixelsnail_bottom, pixelsnail_bottom.device, 1, [16, 16], 1, condition=top_sample).reshape(-1)
+        latents = torch.cat([top_sample.reshape(-1), bottom_sample], axis=-1)
+
+        est = optimizer.models[-1].regressor_
+        unimportant_features = np.argsort(-est.feature_importances_[64:])[64:]
+
+        # initialize the search space manually
+        space = Space(func.get_bounds())
+
+        # get the core of the gurobi model from helper function 'get_core_gurobi_model'
+        core_model = get_core_gurobi_model(space)
+
+        for i in unimportant_features:
+            core_model.addConstr(core_model._cat_var_dict[i][int(latents[i])] == 1)
+
+        core_model.update()
+
+        optimizer.acq_optimizer_kwargs['add_model_core'] = core_model
+        optimizer.update_next()
+
         # check if optimization is performed in batches
         if batch_size is not None:
             _batch_size = min([_n_calls, batch_size])
@@ -204,6 +259,7 @@ def entmoot_train_opt(
             next_x = optimizer.ask(strategy=batch_strategy)
             end_time = time.time()
             LOGGER.info(f"Optimization procedure for iteration {itr} took {end_time - start_time:.1f}s to finish")
+            LOGGER.info(f"Randomly drawn initial sample: {latents}")
             LOGGER.info(f"Suggested sample: {next_x}")
 
         next_y = func(next_x)
@@ -276,8 +332,6 @@ def entmoot_train_opt(
 
 if __name__ == "__main__":
 
-    
-    
     args = parser.parse_args()
     pl.seed_everything(args.seed)
     
@@ -286,6 +340,8 @@ if __name__ == "__main__":
     entmoot_train_opt(
         args.data_file,
         args.save_file,
+        args.pixelsnail_top_file,
+        args.pixelsnail_bottom_file,
         func,
         func.get_bounds(),
         logfile=args.logfile,
@@ -300,7 +356,7 @@ if __name__ == "__main__":
         acq_optimizer="global",
         random_state=1,
         acq_func_kwargs=None,
-        acq_optimizer_kwargs={'gurobi_timelimit': 2*60},
+        acq_optimizer_kwargs={'gurobi_timelimit': 100*60},
         base_estimator_kwargs={'n_estimators': 800, 'min_child_samples': 20, 'max_depth': 2, 'num_leaves': 5, 'device': 'cpu'},
         std_estimator_kwargs=None,
         model_queue_size=None,

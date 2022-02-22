@@ -189,7 +189,7 @@ def sample_model(model, device, batch, size, temperature, condition=None):
     return row
 
 
-def latent_optimization(args, model, scaled_predictor, pixelsnail_bottom,datamodule, num_queries_to_do, bo_data_file, bo_run_folder, curr_model_path, pbar=None, postfix=None):
+def latent_optimization(args, model, scaled_predictor, datamodule, num_queries_to_do, bo_data_file, bo_run_folder, curr_model_path, pbar=None, postfix=None):
     """ perform latent space optimization using traditional local optimization strategies with tree-based models """
 
     ##################################################
@@ -228,7 +228,8 @@ def latent_optimization(args, model, scaled_predictor, pixelsnail_bottom,datamod
             y_test=[],
         )
 
-    _save_bo_data(latent_points_t, targets)
+    latent_points = np.concatenate([latent_points_t, latent_points_b], axis=1)
+    _save_bo_data(latent_points, targets)
 
     # Part 1: fit and optimize surrogate model
     # ===============================
@@ -236,7 +237,6 @@ def latent_optimization(args, model, scaled_predictor, pixelsnail_bottom,datamod
 
     opt_path = bo_run_folder / f"bo_opt_res.npy"
     log_path = bo_run_folder / f"bo_train_opt.log"
-    
 
     bo_opt_command = [
         "python",
@@ -246,7 +246,9 @@ def latent_optimization(args, model, scaled_predictor, pixelsnail_bottom,datamod
         f"--save_file={str(opt_path)}",
         f"--logfile={str(log_path)}",
         f"--n_out={str(num_queries_to_do)}",
-        f"--model={str(curr_model_path)}"
+        f"--model_path={str(curr_model_path)}",
+        f"--pixelsnail_top_file={str(args.pixelsnail_top_file)}",
+        f"--pixelsnail_bottom_file={str(args.pixelsnail_bottom_file)}"
     ]
     
     model_fit_opt_desc = "Tree-based model fit and optimize"
@@ -258,17 +260,19 @@ def latent_optimization(args, model, scaled_predictor, pixelsnail_bottom,datamod
     _run_command(bo_opt_command, "Tree-based model fit / optimize")
 
     # Load point
-    z_opt_t = np.load(opt_path)
-    z_sample_b = sample_model(pixelsnail_bottom, pixelsnail_bottom.device, z_opt_t.shape[0], [16, 16], 1,
-                              condition=torch.as_tensor(z_opt_t, device=pixelsnail_bottom.device).reshape(-1,8,8))
+    z_opt = np.load(opt_path)
+    z_opt_t = z_opt[:,:64].reshape(-1, 8, 8)
+    z_opt_b = z_opt[:,64:].reshape(-1, 16, 16)
+    #z_sample_b = sample_model(pixelsnail_bottom, pixelsnail_bottom.device, z_opt_t.shape[0], [16, 16], 1,
+    #                          condition=torch.as_tensor(z_opt_t, device=pixelsnail_bottom.device).reshape(-1,8,8))
 
     
     # Decode point
     x_new, y_new = _batch_decode_z_and_props(
         model,
         scaled_predictor,
-        torch.as_tensor(z_opt_t, device=model.device).reshape(-1,8,8),
-        z_sample_b
+        torch.as_tensor(z_opt_t, device=model.device),
+        torch.as_tensor(z_opt_b, device=model.device)
     )
 
     # Reset pbar description
@@ -281,7 +285,7 @@ def latent_optimization(args, model, scaled_predictor, pixelsnail_bottom,datamod
             pbar.set_postfix(postfix)
 
     # Update datamodule with ALL data points
-    return x_new, y_new, z_opt_t, z_sample_b.detach().numpy()
+    return x_new, y_new, z_opt_t, z_opt_b
 
 
 def main_loop(args):
@@ -297,7 +301,8 @@ def main_loop(args):
     model = CelebaVQVAE2.load_from_checkpoint(args.pretrained_model_file)
 
     # Load pre-trained PixelSNAIL bottom model
-    pixelsnail_bottom = PixelSNAIL.load_from_checkpoint(args.pixelsnail_bottom_file)
+    #pixelsnail_bottom = PixelSNAIL.load_from_checkpoint(args.pixelsnail_bottom_file)
+    #pixelsnail_top = PixelSNAIL.load_from_checkpoint(args.pixelsnail_top_file)
 
     # Load pretrained (temperature-scaled) CelebA-Dialog predictor
     checkpoint_predictor = torch.load(args.pretrained_predictor_file, map_location=torch.device('cpu'))
@@ -381,7 +386,6 @@ def main_loop(args):
                     args,
                     model,
                     scaled_predictor,
-                    pixelsnail_bottom,
                     datamodule,
                     num_queries_to_do,
                     bo_data_file=bo_data_file,

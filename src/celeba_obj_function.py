@@ -34,7 +34,7 @@ class CelebaTargetPredictor(BenchmarkFunction):
         self.pixelsnail_bottom = PixelSNAIL.load_from_checkpoint("logs/train/celeba/pixelsnail_bottom/lightning_logs/version_2/checkpoints/last.ckpt")
 
         # define value restrictions for animation vector
-        self.latent_variables_dims = [Categorical([i for i in range(512)], transform="label") for _ in range(64)]
+        self.latent_variables_dims = [Categorical([i for i in range(512)], transform="label") for _ in range(320)]
 
     def get_bounds(self):
         """ Get bounds of input variables.
@@ -50,16 +50,17 @@ class CelebaTargetPredictor(BenchmarkFunction):
         """
         pass
 
-    def _eval_point(self, z_top):
+    def _eval_point(self, z):
         """ Evaluates input vector using surrogate model.
         Args:
             z (list): Input vector.
         Returns:
             int: Negative output of surrogate model (as we minimize).
         """
-        z_top = torch.tensor(z_top).reshape(1,8,8)
-        z_bottom = sample_model(self.pixelsnail_bottom, self.pixelsnail_bottom.device, z_top.shape[0], [16, 16], 1,
-                                  condition=torch.as_tensor(z_top, device=self.pixelsnail_bottom.device))
+        z_top = torch.tensor(z[:64]).reshape(1,8,8)
+        z_bottom = torch.tensor(z[64:]).reshape(1, 16, 16)
+        #z_bottom = sample_model(self.pixelsnail_bottom, self.pixelsnail_bottom.device, z_top.shape[0], [16, 16], 1,
+        #                          condition=torch.as_tensor(z_top, device=self.pixelsnail_bottom.device))
         x_input = self.generative_model.decode_code(z_top, z_bottom)
         x_input_upscaled = torch.nn.functional.interpolate(x_input, size=(128, 128), mode='bicubic',
                                                            align_corners=False)
