@@ -1,7 +1,7 @@
 # Script to conduct all CelebA-VQVAE experiments
 
 # Meta flags
-gpu="--gpu"
+gpu=""
 
 # Weighted retraining hyperparameters
 query_budget=500
@@ -22,7 +22,7 @@ celeba_data_path="data/celeba-dialog"
 # Run the command
 python src/opt_scripts/opt_celeba_vqvae.py \
     --seed="1" $gpu \
-    --tensor_dir="/content/data_tensors_64" \
+    --tensor_dir="data/celeba-dialog/data_tensors_64" \
     --property_id=3 \
     --max_property_value=2 \
     --train_attr_path="${celeba_data_path}/train_attr_list.txt" \
@@ -32,7 +32,7 @@ python src/opt_scripts/opt_celeba_vqvae.py \
     --attr_file="src/configs/attributes.json" \
     --query_budget="$query_budget" \
     --retraining_frequency="$r" \
-    --result_root="${root_dir}/k_${k}/r_${r}/seed1_custom" \
+    --result_root="${root_dir}/k_${k}/r_${r}/seed1_initsamp" \
     --pretrained_model_file="$start_model" \
     --pretrained_predictor_file="$pretrained_predictor_file" \
     --scaled_predictor_state_dict="$scaled_predictor_state_dict" \
@@ -40,6 +40,5 @@ python src/opt_scripts/opt_celeba_vqvae.py \
     --rank_weight_k="$k" \
     --n_retrain_epochs="$n_retrain_epochs" \
     --n_init_retrain_epochs="$n_init_retrain_epochs" \
-    --n_out=5 \
     --mode="all" \
     --batch_size=128

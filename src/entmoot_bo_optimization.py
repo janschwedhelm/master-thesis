@@ -300,7 +300,7 @@ if __name__ == "__main__":
         random_state=1,
         acq_func_kwargs=None,
         acq_optimizer_kwargs={'gurobi_timelimit': 2*60},
-        base_estimator_kwargs={'n_estimators': 800, 'min_child_samples': 20, 'max_depth': 2, 'num_leaves': 5, 'device': 'gpu'},
+        base_estimator_kwargs={'n_estimators': 800, 'min_child_samples': 20, 'max_depth': 2, 'num_leaves': 5},
         std_estimator_kwargs=None,
         model_queue_size=None,
         verbose=1,
