@@ -7,8 +7,7 @@ import sys
 import logging
 import subprocess
 import time
-from tqdm.auto import tqdm, trange
-import pytorch_lightning as pl
+from tqdm.auto import tqdm
 import ruamel.yaml
 
 from src.dataloader_celeba_weighting import *
@@ -17,8 +16,8 @@ from src.resnet50 import resnet50
 from src import utils
 from src.opt_scripts import base as wr_base
 from src.torch_mimicry.training.trainer import Trainer
-from src.pg_modules.discriminator import ProjectedDiscriminator
-from src.pg_modules.networks_fastgan import Generator
+from src.projected_gan.pg_modules.networks_fastgan import Generator
+from src.projected_gan.pg_modules.discriminator import ProjectedDiscriminator
 from src.dataloader_celeba_weighting import CelebaWeightedTensorDataset
 from src import GP_TRAIN_FILE, DNGO_TRAIN_FILE, GP_OPT_SAMPLING_FILE
 
@@ -403,14 +402,11 @@ def main_loop(args):
     dataloader = datamodule.train_dataloader()
 
     # Load pre-trained SN-GAN generator / discriminator
-    if args.opt_method != "sampling":
-        netG = SNGANGenerator64(nz=64).to(device)
-    else:
-        netG = SNGANGenerator64(nz=128).to(device)
-    netD = SNGANDiscriminator64().to(device)
+    netG = Generator().to(device)
+    netD = ProjectedDiscriminator(backbone_kwargs={'num_discs': 4}).to(device)
 
-    netG.restore_checkpoint(args.pretrained_netg_model_file)
-    netD.restore_checkpoint(args.pretrained_netd_model_file)
+    netG.load_state_dict(torch.load(args.pretrained_netg_model_file))
+    netD.load_state_dict(torch.load(args.pretrained_netd_model_file))
     optD = optim.Adam(netD.parameters(), 1e-4, betas=(0.0, 0.9))
     optG = optim.Adam(netG.parameters(), 1e-4, betas=(0.0, 0.9))
 

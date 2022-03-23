@@ -3,7 +3,7 @@
 # modified by Axel Sauer for "Projected GANs Converge Faster"
 #
 import torch.nn as nn
-from src.pg_modules.blocks import (InitLayer, UpBlockBig, UpBlockBigCond, UpBlockSmall, UpBlockSmallCond, SEBlock, conv2d)
+from src.projected_gan.pg_modules.blocks import (InitLayer, UpBlockBig, UpBlockBigCond, UpBlockSmall, UpBlockSmallCond, SEBlock, conv2d)
 
 
 def normalize_second_moment(x, dim=1, eps=1e-8):

@@ -4,9 +4,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from src.pg_modules.blocks import DownBlock, DownBlockPatch, conv2d
-from src.pg_modules.projector import F_RandomProj
-from src.pg_modules.diffaug import DiffAugment
+from src.projected_gan.pg_modules.blocks import DownBlock, DownBlockPatch, conv2d
+from src.projected_gan.pg_modules.projector import F_RandomProj
+from src.projected_gan.pg_modules.diffaug import DiffAugment
 
 
 class SingleDisc(nn.Module):

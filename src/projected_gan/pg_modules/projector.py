@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import timm
-from src.pg_modules.blocks import FeatureFusionBlock
+from src.projected_gan.pg_modules.blocks import FeatureFusionBlock
 
 
 def _make_scratch_ccm(scratch, in_channels, cout, expand=False):
