@@ -1,4 +1,4 @@
-""" Run weighted retraining for CelebA with the SN-GAN model """
+""" Run weighted retraining for CelebA with the SN-GAN model and stronger NAS sampling method """
 
 import argparse
 from pathlib import Path
@@ -7,7 +7,8 @@ import sys
 import logging
 import subprocess
 import time
-from tqdm.auto import tqdm
+from tqdm.auto import tqdm, trange
+import pytorch_lightning as pl
 import ruamel.yaml
 
 from src.dataloader_celeba_weighting import *
@@ -16,10 +17,11 @@ from src.resnet50 import resnet50
 from src import utils
 from src.opt_scripts import base as wr_base
 from src.torch_mimicry.training.trainer import Trainer
-from src.projected_gan.pg_modules.networks_fastgan import Generator
-from src.projected_gan.pg_modules.discriminator import ProjectedDiscriminator
+from src.torch_mimicry.nets.sngan.sngan_64 import SNGANGenerator64, SNGANDiscriminator64
 from src.dataloader_celeba_weighting import CelebaWeightedTensorDataset
 from src import GP_TRAIN_FILE, DNGO_TRAIN_FILE, GP_OPT_SAMPLING_FILE
+from src.projected_gan.pg_modules.networks_fastgan import Generator
+from src.projected_gan.pg_modules.discriminator import ProjectedDiscriminator
 from src.projected_gan.train import train
 
 logger = logging.getLogger("celeba-opt")
@@ -50,15 +52,14 @@ def retrain_model(args, G, D, G_ema, dataloader, save_dir, version_str, num_step
           tick=1000, snap=1000000, seed=args.seed, restart_every=9999999, ema_num_steps=int(num_steps/100))
 
 
-
 def generate_samples(netG, netD, n_samples, discriminator_quantile_threshold, opt_method, device):
     """ helper function to generate samples """
     batch_size = 50
     images = torch.zeros(size=(n_samples, 3, 64, 64))
     if opt_method != "sampling":
-        latents = torch.zeros(size=(n_samples, 128))
-    else:
         latents = torch.zeros(size=(n_samples, 64))
+    else:
+        latents = torch.zeros(size=(n_samples, 128))
     seed = int(np.random.randint(10000))
     pl.seed_everything(seed)
 
@@ -84,10 +85,10 @@ def generate_samples(netG, netD, n_samples, discriminator_quantile_threshold, op
         with torch.no_grad():
             # Set model to evaluation mode
             netD.eval()
-    
+
             # Inference variables
             batch_size = min(n_samples, batch_size)
-    
+
             # Collect all samples()
             probabilities = []
             start_time = time.time()
@@ -96,13 +97,13 @@ def generate_samples(netG, netD, n_samples, discriminator_quantile_threshold, op
                 probas = torch.sigmoid(netD(images[idx: idx + batch_size].to(device)))
                 probas = probas.cpu().numpy()
                 probabilities.append(probas)
-    
+
             probabilities = np.concatenate(probabilities, axis=0)
             probabilities = probabilities.flatten()
-    
+
             threshold_probability = np.quantile(probabilities, discriminator_quantile_threshold)
             good_idx = np.where(probabilities >= threshold_probability)
-    
+
             return images[good_idx], latents[good_idx], threshold_probability
     else:
         return images, latents, None
@@ -141,7 +142,7 @@ def _batch_get_props(images, predictor, device):
     with torch.no_grad():
         # Inference variables
         batch_size = min(images.shape[0], batch_size)
-        
+
         properties = []
         for idx in range(0, images.shape[0], batch_size):
             # normalize images
@@ -150,13 +151,13 @@ def _batch_get_props(images, predictor, device):
             img_mean = torch.Tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1).to(device)
             img_std = torch.Tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1).to(device)
             images_normalized = (images_upscaled - img_mean) / img_std
-        
+
             predictions = predictor(images_normalized)
             probas_predictions = torch.nn.functional.softmax(predictions, dim=1).cpu().numpy()
             props = probas_predictions @ np.array([0, 1, 2, 3, 4, 5])
             properties.append(props)
             del images_normalized
-    
+
     properties = np.concatenate(properties, axis=0)
 
     return properties
@@ -174,7 +175,7 @@ def _batch_decode_z_and_props(netG, predictor, z, get_props=True):
             img = netG(z[j: j + batch_size])
             z_decode.append(img.cpu())
             del img
-    
+
     # Concatentate all points and convert to numpy
     z_decode = torch.cat(z_decode, dim=0).to(netG.device)
 
@@ -192,12 +193,12 @@ def latent_optimization(args, netG, netD, scaled_predictor, dataloader, num_quer
     ##################################################
     # Prepare BO
     ##################################################
-    
-    ground_truth_images, ground_truth_latents, _ = generate_samples(netG, netD, args.n_samples,
+
+    ground_truth_images, ground_truth_latents, _ = generate_samples(netG, netD, args.M_0,
                                                                     args.ground_truth_discriminator_threshold, args.opt_method, device)
-                                                                    
+
     pred_targets = _batch_get_props(ground_truth_images, scaled_predictor, device)
-    
+
     latent_points, targets = _choose_best_rand_points(ground_truth_latents, pred_targets)
 
     netG = netG.cpu()  # Make sure to free up GPU memory
@@ -223,90 +224,101 @@ def latent_optimization(args, netG, netD, scaled_predictor, dataloader, num_quer
 
     # Part 1: fit surrogate model
     # ===============================
-    iter_seed = int(np.random.randint(10000))
+    curr_bo_file = None
+    all_new_x = []
+    all_new_y = []
+    all_new_z = []
+    for gp_iter in range(int(num_queries_to_do / args.M)):
+        new_bo_file = bo_run_folder / f"bo_train_res{gp_iter:04d}.npz"
+        log_path = bo_run_folder / f"bo_train{gp_iter:04d}.log"
+        iter_seed = int(np.random.randint(10000))
 
-    new_bo_file = bo_run_folder / f"bo_train_res.npz"
-    log_path = bo_run_folder / f"bo_train.log"
-    
-    if args.bo_surrogate == "GP":
-        gp_train_command = [
-            "python",
-            GP_TRAIN_FILE,
-            f"--nZ={args.n_inducing_points}",
-            f"--seed={iter_seed}",
-            f"--data_file={str(bo_data_file)}",
-            f"--save_file={str(new_bo_file)}",
-            f"--logfile={str(log_path)}",
-        ]
-
-        # Add commands for initial fitting
-        gp_fit_desc = "GP initial fit"
-        gp_train_command += [
-            "--init",
-            "--kmeans_init",
-        ]
-
-        # Set pbar status for user
-        if pbar is not None:
-            old_desc = pbar.desc
-            pbar.set_description(gp_fit_desc)
-
-        # Run command
-        _run_command(gp_train_command, f"GP train")
-        curr_bo_file = new_bo_file
-    elif args.bo_surrogate == "DNGO":
-        dngo_train_command = [
-            "python",
-            DNGO_TRAIN_FILE,
-            f"--seed={iter_seed}",
-            f"--data_file={str(bo_data_file)}",
-            f"--save_file={str(new_bo_file)}",
-            f"--logfile={str(log_path)}",
-        ]
-
-        # Add commands for initial fitting
-        dngo_fit_desc = "DNGO initial fit"
-
-        # Set pbar status for user
-        if pbar is not None:
-            old_desc = pbar.desc
-            pbar.set_description(dngo_fit_desc)
-
-        # Run command
-        print("Start training DNGO")
-        _run_command(dngo_train_command, f"DNGO train")
-        curr_bo_file = new_bo_file
-    else:
-        raise NotImplementedError(args.bo_surrogate)
-
-    # Part 2: optimize surrogate acquisition func to query point
-    # ===============================
-    
-    # Run GP opt script
-    opt_path = bo_run_folder / f"bo_opt_res.npy"
-    log_path = bo_run_folder / f"bo_opt.log"
-    if args.opt_constraint_threshold:
-        if args.n_gmm_components:
-            bo_opt_command = [
+        if args.bo_surrogate == "GP":
+            gp_train_command = [
                 "python",
-                GP_OPT_SAMPLING_FILE,
+                GP_TRAIN_FILE,
+                f"--nZ={args.n_inducing_points}",
                 f"--seed={iter_seed}",
-                f"--surrogate_file={str(curr_bo_file)}",
                 f"--data_file={str(bo_data_file)}",
-                f"--save_file={str(opt_path)}",
+                f"--save_file={str(new_bo_file)}",
                 f"--logfile={str(log_path)}",
-                f"--n_samples={args.n_samples}",
-                f"--sample_distribution={str(args.sample_distribution)}",
-                f"--n_out={str(num_queries_to_do)}",
-                f"--bo_surrogate={args.bo_surrogate}",
-                f"--n_starts={args.n_starts}",
-                f"--opt_method={args.opt_method}",
-                f"--sparse_out={args.sparse_out}",
-                f"--pretrained_model_prior={args.pretrained_model_prior}",
-                f"--opt_constraint_threshold={args.opt_constraint_threshold}",
-                f"--opt_constraint_strategy={args.opt_constraint_strategy}",
-                f"--n_gmm_components={args.n_gmm_components}",
             ]
+
+            if gp_iter == 0:
+                # Add commands for initial fitting
+                gp_fit_desc = "GP initial fit"
+                gp_train_command += [
+                    "--init",
+                    "--kmeans_init",
+                ]
+            else:
+                gp_fit_desc = "GP incremental fit"
+                gp_train_command += [
+                    f"--gp_file={str(curr_bo_file)}",
+                    f"--n_perf_measure=1",  # specifically see how well it fits the last point!
+                ]
+
+            # Set pbar status for user
+            if pbar is not None:
+                old_desc = pbar.desc
+                pbar.set_description(gp_fit_desc)
+
+            # Run command
+            _run_command(gp_train_command, f"GP train")
+            curr_bo_file = new_bo_file
+        else:
+            raise NotImplementedError(args.bo_surrogate)
+
+        # Part 2: optimize surrogate acquisition func to query point
+        # ===============================
+
+        # Run GP opt script
+        opt_path = bo_run_folder / f"bo_opt_res{gp_iter:04d}.npy"
+        log_path = bo_run_folder / f"bo_opt_{gp_iter:04d}.log"
+        if args.opt_constraint_threshold:
+            if args.n_gmm_components:
+                bo_opt_command = [
+                    "python",
+                    GP_OPT_SAMPLING_FILE,
+                    f"--seed={iter_seed}",
+                    f"--surrogate_file={str(curr_bo_file)}",
+                    f"--data_file={str(bo_data_file)}",
+                    f"--save_file={str(opt_path)}",
+                    f"--logfile={str(log_path)}",
+                    f"--n_samples={args.N}",
+                    f"--sample_distribution={str(args.sample_distribution)}",
+                    f"--n_out={str(args.M)}",
+                    f"--bo_surrogate={args.bo_surrogate}",
+                    f"--n_starts={args.n_starts}",
+                    f"--opt_method={args.opt_method}",
+                    f"--sparse_out={args.sparse_out}",
+                    f"--pretrained_model_prior={args.pretrained_model_prior}",
+                    f"--opt_constraint_threshold={args.opt_constraint_threshold}",
+                    f"--opt_constraint_strategy={args.opt_constraint_strategy}",
+                    f"--n_gmm_components={args.n_gmm_components}",
+                ]
+            else:
+                bo_opt_command = [
+                    "python",
+                    GP_OPT_SAMPLING_FILE,
+                    f"--seed={iter_seed}",
+                    f"--surrogate_file={str(curr_bo_file)}",
+                    f"--data_file={str(bo_data_file)}",
+                    f"--save_file={str(opt_path)}",
+                    f"--logfile={str(log_path)}",
+                    f"--n_samples={args.N}",
+                    f"--sample_distribution={args.sample_distribution}",
+                    f"--n_out={str(args.M)}",
+                    f"--bo_surrogate={args.bo_surrogate}",
+                    f"--n_starts={args.n_starts}",
+                    f"--opt_method={args.opt_method}",
+                    f"--sparse_out={args.sparse_out}",
+                    f"--pretrained_model_prior={args.pretrained_model_prior}",
+                    f"--opt_constraint_threshold={args.opt_constraint_threshold}",
+                    f"--opt_constraint_strategy={args.opt_constraint_strategy}",
+                    f"--curr_generator_file={str(curr_generator_file)}",
+                    f"--curr_discriminator_file={str(curr_discriminator_file)}"
+                ]
         else:
             bo_opt_command = [
                 "python",
@@ -316,65 +328,53 @@ def latent_optimization(args, netG, netD, scaled_predictor, dataloader, num_quer
                 f"--data_file={str(bo_data_file)}",
                 f"--save_file={str(opt_path)}",
                 f"--logfile={str(log_path)}",
-                f"--n_samples={args.n_samples}",
-                f"--sample_distribution={args.sample_distribution}",
-                f"--n_out={num_queries_to_do}",
+                f"--n_samples={args.N}",
+                f"--sample_distribution={str(args.sample_distribution)}",
+                f"--n_out={str(args.M)}",
                 f"--bo_surrogate={args.bo_surrogate}",
                 f"--n_starts={args.n_starts}",
                 f"--opt_method={args.opt_method}",
                 f"--sparse_out={args.sparse_out}",
+                f"--opt_method={args.opt_method}",
                 f"--pretrained_model_prior={args.pretrained_model_prior}",
-                f"--opt_constraint_threshold={args.opt_constraint_threshold}",
-                f"--opt_constraint_strategy={args.opt_constraint_strategy}",
-                f"--curr_generator_file={str(curr_generator_file)}",
-                f"--curr_discriminator_file={str(curr_discriminator_file)}"
             ]
-    else:
-        bo_opt_command = [
-            "python",
-            GP_OPT_SAMPLING_FILE,
-            f"--seed={iter_seed}",
-            f"--surrogate_file={str(curr_bo_file)}",
-            f"--data_file={str(bo_data_file)}",
-            f"--save_file={str(opt_path)}",
-            f"--logfile={str(log_path)}",
-            f"--n_samples={args.n_samples}",
-            f"--sample_distribution={str(args.sample_distribution)}",
-            f"--n_out={str(num_queries_to_do)}",
-            f"--bo_surrogate={args.bo_surrogate}",
-            f"--n_starts={args.n_starts}",
-            f"--opt_method={args.opt_method}",
-            f"--sparse_out={args.sparse_out}",
-            f"--opt_method={args.opt_method}",
-            f"--pretrained_model_prior={args.pretrained_model_prior}",
-        ]
-    if pbar is not None:
-        pbar.set_description("optimizing acq func")
-    print("Start optimizing DNGO")
-    _run_command(bo_opt_command, f"Surrogate opt")
+        if pbar is not None:
+            pbar.set_description("optimizing acq func")
 
-    # Load point
-    z_opt = np.load(opt_path)
-    
-    # Decode point
-    netG.to(device)
-    x_new, y_new = _batch_decode_z_and_props(
-        netG,
-        scaled_predictor,
-        torch.as_tensor(z_opt, device=device)
-    )
+        _run_command(bo_opt_command, f"Surrogate opt")
 
-    # Reset pbar description
-    if pbar is not None:
-        pbar.set_description(old_desc)
+        # Load point
+        z_opt = np.load(opt_path)
 
-        # Update best point in progress bar
-        if postfix is not None:
-            postfix["best"] = max(postfix["best"], float(max(y_new)))
-            pbar.set_postfix(postfix)
+        # Decode point
+        netG.to(device)
+        x_new, y_new = _batch_decode_z_and_props(
+            netG,
+            scaled_predictor,
+            torch.as_tensor(z_opt, device=device)
+        )
+
+        # Append to new GP data
+        latent_points = np.concatenate([latent_points, z_opt], axis=0)
+        targets = np.concatenate([targets, y_new], axis=0)
+        _save_bo_data(latent_points, targets)
+
+        # Append to overall list
+        all_new_x.append(x_new)
+        all_new_y.append(y_new)
+        all_new_z.append(z_opt)
+
+        # Reset pbar description
+        if pbar is not None:
+            pbar.set_description(old_desc)
+
+            # Update best point in progress bar
+            if postfix is not None:
+                postfix["best"] = max(postfix["best"], float(max(y_new)))
+                pbar.set_postfix(postfix)
 
     # Update datamodule with ALL data points
-    return x_new, y_new, z_opt
+    return torch.cat(all_new_x, dim=0), np.concatenate([all_new_y], axis=0).reshape(-1), np.concatenate([all_new_z], axis=0)
 
 
 def main_loop(args):
@@ -389,6 +389,7 @@ def main_loop(args):
     datamodule = CelebaWeightedTensorDataset(args, utils.DataWeighter(args))
     datamodule.setup("fit")
     dataloader = datamodule.train_dataloader()
+
 
     # Load pre-trained SN-GAN generator / discriminator
     G = Generator().to(device)
@@ -474,7 +475,6 @@ def main_loop(args):
             num_queries_to_do = min(
                 args.retraining_frequency, args.query_budget - samples_so_far
             )
-            ########### Continue here!
             if args.lso_strategy == "opt":
                 gp_dir = result_dir / "gp" / f"iter{samples_so_far}"
                 curr_discriminator_file = result_dir / "retraining" / f"retrain_{samples_so_far}" / "checkpoints" / "netD" / f"netD_{num_steps}_steps.pth"
@@ -485,13 +485,13 @@ def main_loop(args):
                 else:
                     curr_discriminator_file = None
                     curr_generator_file = None
-                    
+
                 gp_dir.mkdir(parents=True)
                 bo_data_file = gp_dir / "data.npz"
                 x_new, y_new, z_query = latent_optimization(
                     args,
-                    G,
-                    D,
+                    netG,
+                    netD,
                     scaled_predictor,
                     dataloader,
                     num_queries_to_do,
@@ -514,8 +514,9 @@ def main_loop(args):
             for i, x in enumerate(x_new):
                 torch.save(x, str(Path(data_dir) / f"sampled_data_iter{samples_so_far}/tensor_{i}.pt"), pickle_protocol=pickle.HIGHEST_PROTOCOL)
                 new_filename_list.append(str(Path(data_dir) / f"sampled_data_iter{samples_so_far}/tensor_{i}.pt"))
-            
+
             # Append new points to dataset and adapt weighting
+
             datamodule.append_train_data(new_filename_list, y_new)
 
             # Save results
