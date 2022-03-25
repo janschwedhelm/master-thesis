@@ -181,10 +181,10 @@ class SimpleFilenameToTensorDataset(Dataset):
             upper_level = rounddown(filename_idx, 1000)
             middle_level = rounddown(filename_idx, 100)
             lower_level = rounddown(filename_idx, 10)
-            image = torch.load(self.data_dir + f"/{upper_level}/{middle_level}/{lower_level}/{filename_idx}.pt").unsqueeze(0)
+            image = torch.load(self.data_dir + f"/{upper_level}/{middle_level}/{lower_level}/{filename_idx}.pt")#.unsqueeze(0)
         else:
-            image = torch.load(filename).unsqueeze(0)
-        return tuple(image)
+            image = torch.load(filename)#.unsqueeze(0)
+        return image, np.zeros([0], dtype=np.float32)
 
     def __len__(self):
         return len(self.text_list)

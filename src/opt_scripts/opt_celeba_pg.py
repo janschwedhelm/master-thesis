@@ -20,6 +20,7 @@ from src.projected_gan.pg_modules.networks_fastgan import Generator
 from src.projected_gan.pg_modules.discriminator import ProjectedDiscriminator
 from src.dataloader_celeba_weighting import CelebaWeightedTensorDataset
 from src import GP_TRAIN_FILE, DNGO_TRAIN_FILE, GP_OPT_SAMPLING_FILE
+from src.projected_gan.train import train
 
 logger = logging.getLogger("celeba-opt")
 
@@ -43,23 +44,9 @@ def _run_command(command, command_name):
     logger.debug(f"{command_name} done in {time.time() - start_time:.1f}s")
 
 
-def retrain_model(netG, netD, optG, optD, dataloader, save_dir, version_str, num_steps, device):
+def retrain_model(G, D, G_ema, dataloader, save_dir, version_str, num_steps, device):
+    train()
 
-    # Main trainer
-    trainer = Trainer(
-        netD=netD,
-        netG=netG,
-        optD=optD,
-        optG=optG,
-        n_dis=5,
-        num_steps=num_steps,
-        lr_decay=None,
-        dataloader=dataloader,
-        log_dir=str(Path(save_dir) / version_str),
-        netD_ckpt_file=None,
-        netG_ckpt_file=None,
-        device=device)
-    trainer.train()
 
 
 def generate_samples(netG, netD, n_samples, discriminator_quantile_threshold, opt_method, device):
@@ -402,13 +389,16 @@ def main_loop(args):
     dataloader = datamodule.train_dataloader()
 
     # Load pre-trained SN-GAN generator / discriminator
-    netG = Generator().to(device)
-    netD = ProjectedDiscriminator(backbone_kwargs={'num_discs': 4}).to(device)
+    G = Generator().to(device)
+    G_ema = Generator().to(device)
 
-    netG.load_state_dict(torch.load(args.pretrained_netg_model_file))
-    netD.load_state_dict(torch.load(args.pretrained_netd_model_file))
-    optD = optim.Adam(netD.parameters(), 1e-4, betas=(0.0, 0.9))
-    optG = optim.Adam(netG.parameters(), 1e-4, betas=(0.0, 0.9))
+    D = ProjectedDiscriminator(backbone_kwargs={'num_discs': 4}).to(device)
+
+    G.load_state_dict(torch.load(args.pretrained_g_model_file))
+    G_ema.load_state_dict(torch.load(args.pretrained_g_ema_model_file))
+    D.load_state_dict(torch.load(args.pretrained_d_model_file))
+    #optD = optim.Adam(D.parameters(), 1e-8, betas=(0.0, 0.99))
+    #optG = optim.Adam(G.parameters(), 1e-8, betas=(0.0, 0.99))
 
     # Load pretrained (temperature-scaled) CelebA-Dialog predictor
     checkpoint_predictor = torch.load(args.pretrained_predictor_file)
@@ -470,7 +460,7 @@ def main_loop(args):
                 version = f"retrain_{samples_so_far}"
                 # default: run through 10% of the weighted training data in retraining epoch
                 retrain_model(
-                    netG, netD, optG, optD, dataloader, retrain_dir, version, num_steps, device
+                    G, D, G_ema, dataloader, retrain_dir, version, num_steps, device
                 )
 
             # Update progress bar
@@ -497,8 +487,8 @@ def main_loop(args):
                 bo_data_file = gp_dir / "data.npz"
                 x_new, y_new, z_query = latent_optimization(
                     args,
-                    netG,
-                    netD,
+                    G,
+                    D,
                     scaled_predictor,
                     dataloader,
                     num_queries_to_do,
