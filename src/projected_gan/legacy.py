@@ -15,7 +15,7 @@ import copy
 import numpy as np
 import torch
 import io
-import dnnlib
+import src.projected_gan.dnnlib as dnnlib
 from torch_utils import misc
 
 #----------------------------------------------------------------------------

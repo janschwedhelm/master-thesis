@@ -14,9 +14,9 @@ import re
 import json
 import tempfile
 import torch
-import legacy
+import src.projected_gan.legacy as legacy
 
-import dnnlib
+import src.projected_gan.dnnlib as dnnlib
 from training import training_loop
 from metrics import metric_main
 from torch_utils import training_stats
@@ -24,9 +24,9 @@ from torch_utils import custom_ops
 from torch_utils import misc
 
 
-def subprocess_fn(rank, G, D, G_ema, num_steps, dataloader, outdir, num_gpus, batch_size, cond, batch_gpu,
-                  cbase, cmax, metrics, tick, snap, seed, fp32, nobench, workers, restart_every, mapping_num_layers,
-                  ema_num_steps, desc, run_dir, temp_dir):
+def subprocess_fn(rank, G, D, G_ema, num_steps, dataloader, num_gpus, batch_size, batch_gpu,
+                  tick, snap, seed, restart_every,
+                  ema_num_steps, run_dir, temp_dir):
     dnnlib.util.Logger(file_name=os.path.join(run_dir, 'log.txt'), file_mode='a', should_flush=True)
 
     # Init torch.distributed.
@@ -46,14 +46,12 @@ def subprocess_fn(rank, G, D, G_ema, num_steps, dataloader, outdir, num_gpus, ba
         custom_ops.verbosity = 'none'
 
     # Execute training loop.
-    training_loop.training_loop(rank=rank, G=G, D=D, G_ema=G_ema, num_steps=num_steps, dataloader=dataloader, outdir=outdir, num_gpus=num_gpus, batch_size=batch_size, cond=cond, batch_gpu=batch_gpu,
-                  cbase=cbase, cmax=cmax, metrics=metrics, tick=tick, snap=snap, seed=seed, fp32=fp32, nobench=nobench, workers=workers, restart_every=restart_every, mapping_num_layers=mapping_num_layers,
-                  ema_kimg=ema_num_steps, desc=desc, run_dir=run_dir)
+    training_loop.training_loop(rank=rank, G=G, D=D, G_ema=G_ema, num_steps=num_steps, dataloader=dataloader, num_gpus=num_gpus, batch_size=batch_size, batch_gpu=batch_gpu,
+                                tick=tick, snap=snap, seed=seed,restart_every=restart_every, ema_num_steps=ema_num_steps, run_dir=run_dir)
 
 
-def launch_training(G, D, G_ema, num_steps, dataloader, outdir, num_gpus, batch_size, cond, batch_gpu,
-                    cbase, cmax, metrics, tick, snap, seed, fp32, nobench, workers, restart_every, mapping_num_layers,
-                    ema_num_steps, desc):
+def launch_training(G, D, G_ema, num_steps, dataloader, outdir, num_gpus, batch_size, batch_gpu,
+                    tick, snap, seed, restart_every, ema_num_steps, desc):
     dnnlib.util.Logger(should_flush=True)
 
     # Pick output directory.
@@ -104,9 +102,9 @@ def launch_training(G, D, G_ema, num_steps, dataloader, outdir, num_gpus, batch_
     torch.multiprocessing.set_start_method('spawn')
     with tempfile.TemporaryDirectory() as temp_dir:
         if num_gpus == 1:
-            subprocess_fn(rank=0, G=G, D=D, G_ema=G_ema, num_steps=num_steps, dataloader=dataloader, outdir=outdir, num_gpus=num_gpus, batch_size=batch_size, cond=cond, batch_gpu=batch_gpu,
-                  cbase=cbase, cmax=cmax, metrics=metrics, tick=tick, snap=snap, seed=seed, fp32=fp32, nobench=nobench, workers=workers, restart_every=restart_every, mapping_num_layers=mapping_num_layers,
-                  ema_kimg=ema_num_steps, desc=desc, run_dir=run_dir, temp_dir=temp_dir)
+            subprocess_fn(rank=0, G=G, D=D, G_ema=G_ema, num_steps=num_steps, dataloader=dataloader, num_gpus=num_gpus, batch_size=batch_size, batch_gpu=batch_gpu,
+                          tick=tick, snap=snap, seed=seed, restart_every=restart_every, ema_num_steps=ema_num_steps,
+                          run_dir=run_dir, temp_dir=temp_dir)
         #else:
         #    torch.multiprocessing.spawn(fn=subprocess_fn, args=(c, temp_dir), nprocs=c.num_gpus)
 
@@ -167,9 +165,8 @@ def parse_comma_separated_list(s):
 # @click.option('--restart_every',help='Time interval in seconds to restart code', metavar='INT', type=int, default=9999999, show_default=True)
 
 
-def train(G, D, G_ema, num_steps, dataloader, outdir=None, num_gpus=1, batch_size=64, cond=False, batch_gpu=64,
-          cbase=32768, cmax=512, metrics="fid50k_full", tick=4000, snap=50, seed=0, fp32=False, nobench=False, workers=3, restart_every=9999999,
-          mapping_num_layers=2, ema_num_steps = 20000):
+def train(G, D, G_ema, num_steps, dataloader, outdir=None, num_gpus=1, batch_size=64, batch_gpu=64,
+          tick=4000, snap=50, seed=0, restart_every=9999999, ema_num_steps = 20000):
     # Initialize config.
     #opts = dnnlib.EasyDict(kwargs) # Command line arguments.
     #c = dnnlib.EasyDict() # Main config dict.
@@ -257,9 +254,8 @@ def train(G, D, G_ema, num_steps, dataloader, outdir=None, num_gpus=1, batch_siz
     #c.D_kwargs.backbone_kwargs.cond = opts.cond
 
     # Launch.
-    launch_training(G, D, G_ema, num_steps, dataloader, outdir, num_gpus, batch_size, cond, batch_gpu,
-                    cbase, cmax, metrics, tick, snap, seed, fp32, nobench, workers, restart_every, mapping_num_layers,
-                    ema_num_steps, desc)
+    launch_training(G=G, D=D, G_ema=G_ema, num_steps=num_steps, dataloader=dataloader, outdir=outdir, num_gpus=num_gpus, batch_size=batch_size, batch_gpu=batch_gpu,
+                    tick=tick, snap=snap, seed=seed, restart_every=restart_every, ema_num_steps=ema_num_steps, desc=desc)
 
     # Check for restart
     #last_snapshot = misc.get_ckpt_path(c.run_dir)

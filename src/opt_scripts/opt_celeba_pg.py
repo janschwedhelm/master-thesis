@@ -44,8 +44,10 @@ def _run_command(command, command_name):
     logger.debug(f"{command_name} done in {time.time() - start_time:.1f}s")
 
 
-def retrain_model(G, D, G_ema, dataloader, save_dir, version_str, num_steps, device):
-    train()
+def retrain_model(args, G, D, G_ema, dataloader, save_dir, version_str, num_steps):
+    train(G=G, D=D, G_ema=G_ema, num_steps=num_steps, dataloader=dataloader, outdir=str(Path(save_dir) / version_str),
+          num_gpus=1, batch_size=args.batch_size, batch_gpu=args.batch_size,
+          tick=1000, snap=1000000, seed=args.seed, restart_every=9999999, ema_num_steps=int(num_steps/100))
 
 
 
@@ -460,7 +462,7 @@ def main_loop(args):
                 version = f"retrain_{samples_so_far}"
                 # default: run through 10% of the weighted training data in retraining epoch
                 retrain_model(
-                    G, D, G_ema, dataloader, retrain_dir, version, num_steps, device
+                    args, G, D, G_ema, dataloader, retrain_dir, version, num_steps
                 )
 
             # Update progress bar
@@ -472,6 +474,7 @@ def main_loop(args):
             num_queries_to_do = min(
                 args.retraining_frequency, args.query_budget - samples_so_far
             )
+            ########### Continue here!
             if args.lso_strategy == "opt":
                 gp_dir = result_dir / "gp" / f"iter{samples_so_far}"
                 curr_discriminator_file = result_dir / "retraining" / f"retrain_{samples_so_far}" / "checkpoints" / "netD" / f"netD_{num_steps}_steps.pth"

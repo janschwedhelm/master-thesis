@@ -95,9 +95,8 @@ def save_image_grid(img, fname, drange, grid_size):
 #----------------------------------------------------------------------------
 
 def training_loop(
-    rank, G, D, G_ema, num_steps, dataloader, outdir, num_gpus, batch_size, cond, batch_gpu,
-    cbase, cmax, metrics, tick, snap, seed, fp32, nobench, workers, restart_every, mapping_num_layers,
-    ema_num_steps, desc, run_dir,
+    rank, G, D, G_ema, num_steps, dataloader, num_gpus, batch_size, batch_gpu,
+    tick, snap, seed,restart_every, ema_num_steps, run_dir,
     #run_dir                 = '.',      # Output directory.
     #training_set_kwargs     = {},       # Options for training set.
     #data_loader_kwargs      = {},       # Options for torch.utils.data.DataLoader.
@@ -118,8 +117,8 @@ def training_loop(
     D_reg_interval          = 16,       # How often to perform regularization for D? None = disable lazy regularization.
     #total_kimg              = 25000,    # Total length of the training, measured in thousands of real images.
     #kimg_per_tick           = 4,        # Progress snapshot interval.
-    image_snapshot_ticks    = 50,       # How often to save image snapshots? None = disable.
-    network_snapshot_ticks  = 50,       # How often to save network snapshots? None = disable.
+    #image_snapshot_ticks    = 50,       # How often to save image snapshots? None = disable.
+    #network_snapshot_ticks  = 50,       # How often to save network snapshots? None = disable.
     #resume_pkl              = None,     # Network pickle to resume training from.
     resume_num_steps             = 0,        # First kimg to report when resuming training.
     cudnn_benchmark         = True,     # Enable torch.backends.cudnn.benchmark?
@@ -398,7 +397,7 @@ def training_loop(
         # Save network snapshot.
         snapshot_pkl = None
         snapshot_data = None
-        if (network_snapshot_ticks is not None) and (done or cur_tick % network_snapshot_ticks == 0):
+        if (snap is not None) and (done or cur_tick % snap == 0):
             snapshot_data = dict(G=G, D=D, G_ema=G_ema)
             for key, value in snapshot_data.items():
                 if isinstance(value, torch.nn.Module):
@@ -406,8 +405,8 @@ def training_loop(
                 del value # conserve memory
 
         # Save Checkpoint if needed
-        if (rank == 0) and (restart_every > 0) and (network_snapshot_ticks is not None) and (
-                done or cur_tick % network_snapshot_ticks == 0):
+        if (rank == 0) and (restart_every > 0) and (snap is not None) and (
+                done or cur_tick % snap == 0):
             snapshot_pkl = misc.get_ckpt_path(run_dir)
             # save as tensors to avoid error for multi GPU
             snapshot_data['progress'] = {
