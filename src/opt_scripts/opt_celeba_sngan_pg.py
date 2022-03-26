@@ -10,6 +10,9 @@ import time
 from tqdm.auto import tqdm, trange
 import pytorch_lightning as pl
 import ruamel.yaml
+from facenet_pytorch import MTCNN
+import pickle
+import cv2
 
 from src.dataloader_celeba_weighting import *
 from src.temperature_scaling import *
@@ -52,16 +55,17 @@ def retrain_model(args, G, D, G_ema, dataloader, save_dir, version_str, num_step
           tick=1000, snap=1000000, seed=args.seed, restart_every=9999999, ema_num_steps=int(num_steps/100))
 
 
-def generate_samples(netG, netD, n_samples, discriminator_quantile_threshold, opt_method, device):
+def generate_samples(netG, netD, n_samples):#discriminator_quantile_threshold, opt_method, device):
     """ helper function to generate samples """
     batch_size = 50
-    images = torch.zeros(size=(n_samples, 3, 64, 64))
-    if opt_method != "sampling":
-        latents = torch.zeros(size=(n_samples, 64))
-    else:
-        latents = torch.zeros(size=(n_samples, 128))
+    images = torch.zeros(size=(n_samples, 3, 256, 256))
+    #if opt_method != "sampling":
+    #else:
+    latents = torch.zeros(size=(n_samples, 256))
+
     seed = int(np.random.randint(10000))
     pl.seed_everything(seed)
+    z = torch.randn(size=(n_samples, 256))
 
     with torch.no_grad():
         # Set model to evaluation mode
@@ -73,40 +77,43 @@ def generate_samples(netG, netD, n_samples, discriminator_quantile_threshold, op
         # Collect all samples
         for idx in range(n_samples // batch_size):
             # Collect fake image
-            fake_images, z = netG.generate_images(num_images=batch_size, device=device)
+            fake_images = netG(z[idx*batch_size : idx*batch_size + batch_size], c=None)
             fake_images = fake_images.cpu()
-            z = z.cpu()
+            # normalize generated images
+            fake_images = (fake_images.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255)
+            fake_images = (fake_images / 255).permute(0, 3, 1, 2)
+            #z = latents[idx*batch_size : idx*batch_size + batch_size].cpu()
             images[idx*batch_size : idx*batch_size + batch_size] = fake_images
-            latents[idx*batch_size : idx*batch_size + batch_size] = z
+            latents[idx*batch_size : idx*batch_size + batch_size] = z[idx*batch_size : idx*batch_size + batch_size].cpu()
             del fake_images
-            del z
+            #del z
 
-    if discriminator_quantile_threshold != 0.0:
-        with torch.no_grad():
-            # Set model to evaluation mode
-            netD.eval()
-
-            # Inference variables
-            batch_size = min(n_samples, batch_size)
-
-            # Collect all samples()
-            probabilities = []
-            start_time = time.time()
-            for idx in range(0, n_samples, batch_size):
-                # Collect fake image
-                probas = torch.sigmoid(netD(images[idx: idx + batch_size].to(device)))
-                probas = probas.cpu().numpy()
-                probabilities.append(probas)
-
-            probabilities = np.concatenate(probabilities, axis=0)
-            probabilities = probabilities.flatten()
-
-            threshold_probability = np.quantile(probabilities, discriminator_quantile_threshold)
-            good_idx = np.where(probabilities >= threshold_probability)
-
-            return images[good_idx], latents[good_idx], threshold_probability
-    else:
-        return images, latents, None
+    # if discriminator_quantile_threshold != 0.0:
+    #     with torch.no_grad():
+    #         # Set model to evaluation mode
+    #         netD.eval()
+    #
+    #         # Inference variables
+    #         batch_size = min(n_samples, batch_size)
+    #
+    #         # Collect all samples()
+    #         probabilities = []
+    #         start_time = time.time()
+    #         for idx in range(0, n_samples, batch_size):
+    #             # Collect fake image
+    #             probas = torch.sigmoid(netD(images[idx: idx + batch_size].to(device)))
+    #             probas = probas.cpu().numpy()
+    #             probabilities.append(probas)
+    #
+    #         probabilities = np.concatenate(probabilities, axis=0)
+    #         probabilities = probabilities.flatten()
+    #
+    #         threshold_probability = np.quantile(probabilities, discriminator_quantile_threshold)
+    #         good_idx = np.where(probabilities >= threshold_probability)
+    #
+    #         return images[good_idx], latents[good_idx], threshold_probability
+    # else:
+    return images, latents, None
 
 
 def _choose_best_rand_points(latents, targets):
@@ -138,25 +145,51 @@ def _choose_best_rand_points(latents, targets):
 def _batch_get_props(images, predictor, device):
     """ helper function to obtain target properties from images """
     batch_size = 50
+    img_1 = np.uint8((images * 255).permute(0, 2, 3, 1).detach())
 
     with torch.no_grad():
         # Inference variables
         batch_size = min(images.shape[0], batch_size)
 
         properties = []
+        images_preprocessed = []
         for idx in range(0, images.shape[0], batch_size):
             # normalize images
-            images_upscaled = torch.nn.functional.interpolate(images[idx : idx + batch_size].to(device), size=(128, 128), mode='bicubic',
-                                                              align_corners=False)
-            img_mean = torch.Tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1).to(device)
-            img_std = torch.Tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1).to(device)
-            images_normalized = (images_upscaled - img_mean) / img_std
+            mtcnn = MTCNN(select_largest=True, device=device)
+            bboxes, _ = mtcnn.detect(img_1[idx*batch_size : idx*batch_size + batch_size])
+            for i, bbox in enumerate(bboxes):
+                if bboxes is not None:
+                    w0, h0, w1, h1 = bboxes[i][0]
+                    hc, wc = (h0 + h1) / 2, (w0 + w1) / 2
+                    crop = int(((h1 - h0) + (w1 - w0)) / 2 / 2 * 1.1)
+                    h0 = int(hc - crop + crop + crop * 0.15)
+                    w0 = int(wc - crop + crop)
+                    x0, y0, w, h = w0 - crop, h0 - crop, crop * 2, crop * 2
 
-            predictions = predictor(images_normalized)
-            probas_predictions = torch.nn.functional.softmax(predictions, dim=1).cpu().numpy()
-            props = probas_predictions @ np.array([0, 1, 2, 3, 4, 5])
-            properties.append(props)
-            del images_normalized
+                    img_2 = cv2.cvtColor(img_1[idx*batch_size : idx*batch_size + batch_size][i], cv2.COLOR_RGB2BGR)
+                    im_pad = cv2.copyMakeBorder(img_2, h, h, w, w,
+                                                cv2.BORDER_REPLICATE)  # allow cropping outside by replicating borders
+                    img_crop = im_pad[y0 + h:y0 + h * 2, x0 + w:x0 + w * 2]
+
+                    img_res = cv2.cvtColor(img_crop, cv2.COLOR_BGR2RGB)
+                    img_f = torch.Tensor(img_res / 255).permute(2, 0, 1).unsqueeze(0)
+
+                    img_upscaled = torch.nn.functional.interpolate(img_f, size=(128, 128), mode='bicubic',
+                                                                   align_corners=False).to(device)
+
+                    images_preprocessed.append(img_upscaled)
+
+        images_preprocessed = torch.cat(images_preprocessed, 0)
+        img_mean = torch.Tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1).to(device)
+        img_std = torch.Tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1).to(device)
+        images_normalized = (images_preprocessed - img_mean) / img_std
+
+        predictions = predictor(images_normalized)
+        probas_predictions = torch.nn.functional.softmax(predictions, dim=1).cpu().numpy()
+        props = probas_predictions @ np.array([0, 1, 2, 3, 4, 5])
+        properties.append(props)
+        del images_normalized
+        del images_preprocessed
 
     properties = np.concatenate(properties, axis=0)
 
@@ -172,8 +205,13 @@ def _batch_decode_z_and_props(netG, predictor, z, get_props=True):
     batch_size = 50
     for j in range(0, len(z), batch_size):
         with torch.no_grad():
-            img = netG(z[j: j + batch_size])
-            z_decode.append(img.cpu())
+            img = netG(z[j: j + batch_size], c=None)
+            img = img.cpu()
+            # normalize generated images
+            img = (img.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255)
+            img = (img / 255).permute(0, 3, 1, 2)
+            #img = netG(z[j: j + batch_size])
+            z_decode.append(img)
             del img
 
     # Concatentate all points and convert to numpy
@@ -187,15 +225,15 @@ def _batch_decode_z_and_props(netG, predictor, z, get_props=True):
         return z_decode
 
 
-def latent_optimization(args, netG, netD, scaled_predictor, dataloader, num_queries_to_do, bo_data_file, bo_run_folder, device, pbar=None, postfix=None, curr_generator_file=None, curr_discriminator_file=None):
+def latent_optimization(args, netG, netD, scaled_predictor, dataloader, num_queries_to_do, bo_data_file, bo_run_folder, device, pbar=None, postfix=None):#, curr_generator_file=None, curr_discriminator_file=None):
     """ perform latent space optimization using SN-GANs """
 
     ##################################################
     # Prepare BO
     ##################################################
 
-    ground_truth_images, ground_truth_latents, _ = generate_samples(netG, netD, args.M_0,
-                                                                    args.ground_truth_discriminator_threshold, args.opt_method, device)
+    ground_truth_images, ground_truth_latents, _ = generate_samples(netG, netD, args.M_0)
+                                                                    #args.ground_truth_discriminator_threshold, args.opt_method, device)
 
     pred_targets = _batch_get_props(ground_truth_images, scaled_predictor, device)
 
@@ -346,7 +384,7 @@ def latent_optimization(args, netG, netD, scaled_predictor, dataloader, num_quer
         # Load point
         z_opt = np.load(opt_path)
 
-        # Decode point
+        # Decode points
         netG.to(device)
         x_new, y_new = _batch_decode_z_and_props(
             netG,
@@ -477,21 +515,21 @@ def main_loop(args):
             )
             if args.lso_strategy == "opt":
                 gp_dir = result_dir / "gp" / f"iter{samples_so_far}"
-                curr_discriminator_file = result_dir / "retraining" / f"retrain_{samples_so_far}" / "checkpoints" / "netD" / f"netD_{num_steps}_steps.pth"
-                curr_generator_file = result_dir / "retraining" / f"retrain_{samples_so_far}" / "checkpoints" / "netG" / f"netG_{num_steps}_steps.pth"
-                if os.path.exists(result_dir / "retraining" / f"retrain_{samples_so_far}" / "checkpoints" / "netD" / f"netD_{num_steps}_steps.pth"):
-                    curr_discriminator_file = result_dir / "retraining" / f"retrain_{samples_so_far}" / "checkpoints" / "netD" / f"netD_{num_steps}_steps.pth"
-                    curr_generator_file = result_dir / "retraining" / f"retrain_{samples_so_far}" / "checkpoints" / "netG" / f"netG_{num_steps}_steps.pth"
-                else:
-                    curr_discriminator_file = None
-                    curr_generator_file = None
+                #curr_discriminator_file = result_dir / "retraining" / f"retrain_{samples_so_far}" / "checkpoints" / "netD" / f"netD_{num_steps}_steps.pth"
+                #curr_generator_file = result_dir / "retraining" / f"retrain_{samples_so_far}" / "checkpoints" / "netG" / f"netG_{num_steps}_steps.pth"
+                #if os.path.exists(result_dir / "retraining" / f"retrain_{samples_so_far}" / "checkpoints" / "netD" / f"netD_{num_steps}_steps.pth"):
+                #    curr_discriminator_file = result_dir / "retraining" / f"retrain_{samples_so_far}" / "checkpoints" / "netD" / f"netD_{num_steps}_steps.pth"
+                #    curr_generator_file = result_dir / "retraining" / f"retrain_{samples_so_far}" / "checkpoints" / "netG" / f"netG_{num_steps}_steps.pth"
+                #else:
+                #    curr_discriminator_file = None
+                #    curr_generator_file = None
 
                 gp_dir.mkdir(parents=True)
                 bo_data_file = gp_dir / "data.npz"
                 x_new, y_new, z_query = latent_optimization(
                     args,
-                    netG,
-                    netD,
+                    G,
+                    D,
                     scaled_predictor,
                     dataloader,
                     num_queries_to_do,
@@ -499,9 +537,9 @@ def main_loop(args):
                     bo_run_folder=gp_dir,
                     device=device,
                     pbar=pbar,
-                    postfix=postfix,
-                    curr_generator_file = curr_generator_file,
-                    curr_discriminator_file = curr_discriminator_file
+                    postfix=postfix#,
+                    #curr_generator_file = curr_generator_file,
+                    #curr_discriminator_file = curr_discriminator_file
                 )
             else:
                 raise NotImplementedError(args.lso_strategy)
